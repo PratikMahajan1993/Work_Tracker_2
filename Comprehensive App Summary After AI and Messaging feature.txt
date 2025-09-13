@@ -1,0 +1,91 @@
+### **Comprehensive App Summary: Work Tracker**
+
+This document provides a detailed architectural and functional overview of the Work Tracker application. It is intended for developers to quickly understand the project's structure, technology stack, and core implementation patterns.
+
+#### **1. High-Level Overview**
+
+Work Tracker is a native Android application designed to help users log and manage their work activities. Users can start and stop timers for different work categories, add descriptions, and later view and export these logs. The application has recently been enhanced with a reporting hub that allows for generating summaries via SMS (with placeholder AI integration) and exporting logs as PDFs.
+
+#### **2. Core Architecture**
+
+The application follows the modern **MVVM (Model-View-ViewModel)** architecture, adhering to the principles recommended by Google for building robust and maintainable Android apps.
+
+*   **UI Layer (View):** Built entirely with **Jetpack Compose**. The UI is reactive and observes state changes from the ViewModels.
+*   **ViewModel Layer:** `androidx.lifecycle.ViewModel`s are used to hold and manage UI-related state, handle user interactions, and call business logic from the data layer. This layer ensures data survives configuration changes.
+*   **Data Layer:** Implemented using the **Repository Pattern**. The ViewModel communicates with a central `WorkActivityRepository`, which is the single source of truth for all application data. The repository, in turn, interacts with data sources.
+*   **Data Source:** The primary data source is a **Room Database** for persisting work activity logs. **SharedPreferences** is used for storing simple key-value data, such as the user's preferred contact number.
+
+#### **3. Technology Stack & Key Libraries**
+
+*   **UI:** Jetpack Compose, Material 3
+*   **Architecture:** MVVM, Repository Pattern, Unidirectional Data Flow (UDF)
+*   **Dependency Injection:** Hilt
+*   **Asynchronous Programming:** Kotlin Coroutines (used for all database and background operations)
+*   **Database:** Room
+*   **State Management:** Kotlin `StateFlow` and `SharedFlow`
+*   **Navigation:** Jetpack Navigation for Compose
+*   **Local Storage:** SharedPreferences (for simple data persistence)
+
+#### **4. Project Structure Breakdown**
+
+*   `com.example.worktracker.data`: The data layer.
+    *   `database/`: Contains Room database components.
+        *   `entity/WorkActivityLog.kt`: The Room entity defining the schema for a work log.
+        *   `dao/WorkActivityDao.kt`: Data Access Object with methods for database operations (`@Insert`, `@Query`, etc.).
+        *   `AppDatabase.kt`: The Room database class that ties the entities and DAOs together.
+    *   `repository/WorkActivityRepository.kt`: The repository that abstracts data sources. It provides a clean API for the ViewModel to access data (e.g., `getRecentLogs()`, `insertLog()`).
+
+*   `com.example.worktracker.ui`: The UI layer, organized by feature.
+    *   `reports/`: Contains all Composables and the ViewModel for the "Reports Hub" feature.
+        *   `ReportsHubScreen.kt`: The main screen for this feature.
+        *   `ReportsViewModel.kt`: The brain of the screen, managing state and user actions.
+        *   `ReportsUiState.kt`: A data class defining the complete state for the reports screen.
+        *   `SelectLogForSmsDialog.kt`: A reusable dialog for the SMS feature.
+    *   `theme/`: Contains the Material 3 theme, colors, and typography for the app.
+
+*   `com.example.worktracker.di`: Dependency Injection setup.
+    *   `AppModule.kt`: A Hilt module that provides application-scoped dependencies, such as the `GeminiProService` and `SharedPreferences`.
+
+*   `com.example.worktracker.core`: Core logic and utility classes.
+    *   `PdfGenerator.kt`: A utility object for creating PDF files from work logs.
+
+#### **5. Key Features & Implementation Details**
+
+**5.1. Work Activity Logging**
+*   This is the core functionality. The process involves creating a `WorkActivityLog` entity with a start time, category, and description. When the activity is stopped, the `endTime` is set.
+*   All database operations are performed via the `WorkActivityRepository` using coroutines to avoid blocking the main thread.
+
+**5.2. Reporting Hub (`ReportsHubScreen`)**
+This is a central screen for various reporting and analysis tasks.
+
+*   **SMS Functionality:**
+    *   **Trigger:** Initiated from the "Send Activity Details (Text)" `ActionCard`.
+    *   **State Management:** The `ReportsViewModel` manages the entire flow. It fetches candidate logs, shows the `SelectLogForSmsDialog`, and tracks the selected log and generated SMS preview in `ReportsUiState`.
+    *   **Content Generation:** `onLogSelectedForSmsGeneration` in the ViewModel triggers a call to `formatSingleLogForSmsPreview`. **(Special Note:** This currently uses a simple string formatter and a `delay` to simulate a real AI/network call. It is a placeholder for a future real implementation with the `GeminiProService`.)
+    *   **Sending:** On confirmation, the ViewModel emits a `NavigateToSmsApp` event via a `SharedFlow`. The `ReportsHubScreen` collects this event and launches an `ACTION_SENDTO` intent to open the user's default SMS app.
+
+*   **Preferred Contact Persistence:**
+    *   The user's preferred SMS contact number is persisted across app sessions.
+    *   **UI State:** The UI toggles between a display mode (`Text` + "Edit" button) and an edit mode (`OutlinedTextField` + "Save"/"Cancel" buttons), controlled by the `isEditingContactNumber` boolean in `ReportsUiState`.
+    *   **Persistence:** **SharedPreferences** is used for storage. On "Save", the number is written to SharedPreferences. When the ViewModel is initialized (`init` block), this number is read from SharedPreferences to populate the UI state.
+
+#### **6. Special Notes for Developers**
+
+**6.1. Dependency Injection (Hilt)**
+*   The project uses Hilt for managing dependencies.
+*   **ViewModel Injection:** ViewModels are injected into Composable functions using `@HiltViewModel`.
+*   **Constructor Injection:** Classes like `WorkActivityRepository` have their dependencies (e.g., `WorkActivityDao`) injected via their constructor (`@Inject constructor(...)`).
+*   **Module Providers:** Dependencies for interfaces or external libraries (like `SharedPreferences`) are provided in Hilt modules (e.g., `AppModule.kt`) using the `@Provides` annotation. `AppModule` is installed in `SingletonComponent`, meaning its provided dependencies have an application-wide singleton scope.
+
+**6.2. State Management (UDF & StateFlow)**
+*   The app follows a strict Unidirectional Data Flow (UDF) pattern.
+*   **State Exposure:** The `ViewModel` exposes a single state object (`val uiState: StateFlow<ReportsUiState>`). The UI observes this flow using `collectAsState()`.
+*   **State Modification:** The UI never modifies the state directly. It calls functions on the `ViewModel` (e.g., `onSaveContactClicked()`). The ViewModel contains the logic to process this event and updates its internal `MutableStateFlow`, which then automatically emits the new state to the UI.
+*   **One-Time Events:** For navigation or showing Toasts/Snackbars, a `SharedFlow` is used (`eventFlow`). This ensures that events are consumed only once and don't get re-triggered on configuration changes.
+
+**6.3. Asynchronous Operations**
+*   All long-running tasks (database reads/writes, file I/O for PDFs, simulated AI calls) are performed using **Kotlin Coroutines**.
+*   Operations are typically launched within the `viewModelScope`, which automatically handles cancellation when the ViewModel is cleared.
+*   `withContext(Dispatchers.IO)` is used to switch to a background thread for blocking I/O operations like PDF generation.
+
+---

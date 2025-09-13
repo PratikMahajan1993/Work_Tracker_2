@@ -1,0 +1,26 @@
+# Suggested Improvements for Coding Assistance
+
+Based on our accessible chat history, here are several improvements that can be made to the way I approach coding assistance:
+
+1.  **Conciseness in Presenting Code Changes (Diff-style Output):**
+    *   When proposing changes to a file, instead of showing the complete modified file content, directly show a concise "removed lines" and "added lines" format, similar to a code diff. This makes it much easier to review the exact changes being applied.
+
+2.  **Deeper Initial Analysis for Warnings/Errors:**
+    *   When encountering compiler warnings or errors, strive for a deeper initial analysis. This involves looking at the surrounding code context, related project configurations, and modern Android development practices to find the most robust solution from the outset, rather than iterative corrections.
+
+3.  **Batching `write_file` Operations for Comprehensive Changes:**
+    *   **For New Files:** Present the entire intended content of a new file in a single block before executing a single `write_file` operation.
+    *   **For Significant Isolated Additions:** Present the full block of a large, self-contained code addition to an existing file, then execute one `write_file` operation for the entire addition (using a diff for clarity if modifying a part of the file).
+    *   This reduces chat verbosity and provides a clearer understanding of the final state of the updated component.
+
+4.  **Proactive and Contextual Gradle Operations:**
+    *   Be more proactive and contextual with Gradle operations:
+        *   Immediately suggest or perform `gradle_sync` after adding new dependencies or Hilt modules.
+        *   Suggest or perform `gradle_build` (or a more specific task) after a series of related code changes to verify compilation.
+    *   This improves the feedback loop and catches compilation issues earlier.
+
+5.  **Clearer Explanation of *Why* for Best Practices and Refactorings:**
+    *   When proposing changes that reflect best practices, resolve warnings, or improve code quality, briefly and clearly explain the *rationale* behind the change. This enhances the user's learning and justifies the modification.
+
+6.  **Enhanced Iterative Refinement and Clarification:**
+    *   If a user indicates an issue with a previous step or requests further modification, first seek *clarification* to fully understand their intent or the precise problem. This leads to more targeted and effective solutions and minimizes unproductive iterations.

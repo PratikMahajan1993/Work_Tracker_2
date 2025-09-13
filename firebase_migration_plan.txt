@@ -1,0 +1,107 @@
+Phase 1: Firebase Project Setup & Google Sign-In Integration
+
+1.  Firebase Project & App Configuration:
+    *   Create a Firebase project in the Firebase Console (console.firebase.google.com).
+    *   Add your Android app to this Firebase project:
+        *   Provide package name (e.g., from app/build.gradle).
+        *   Provide debug signing certificate SHA-1 (from Android Studio's signingReport Gradle task).
+    *   Download the google-services.json configuration file and place it in the WorkTracker/app directory.
+    *   Enable Google Sign-In as an authentication provider in Firebase (Authentication -> Sign-in method).
+    *   Enable Cloud Firestore in the Firebase console (Firestore Database -> Create database). Start in test mode.
+
+2.  Add Dependencies:
+    *   Firebase Bill of Materials (BOM) (firebase-bom)
+    *   Firebase Authentication (firebase-auth-ktx)
+    *   Google Sign-In for Firebase (play-services-auth)
+    *   Cloud Firestore (firebase-firestore-ktx)
+    *   Firebase Coroutines (e.g., firebase-coroutines-play-services for easier async operations).
+    *   Google Services Gradle plugin (in project and app build.gradle).
+
+3.  Implement Google Sign-In Flow:
+    *   Create SignInScreen.kt (Composable) with a "Sign in with Google" button.
+    *   Create AuthViewModel.kt to:
+        *   Configure Google Sign-In options.
+        *   Launch Google Sign-In intent.
+        *   Handle result: get Google ID token, exchange for Firebase credential, sign in to Firebase.
+        *   Manage user authentication state (signed in, signed out, error).
+    *   On successful sign-in, securely store the Firebase User ID (UID).
+    *   Update app navigation: Go to SignInScreen if not authenticated, else to MainScreen.
+    *   Add sign-out mechanism (e.g., in PreferencesScreen), clearing local Firebase UID.
+
+Phase 2: Data Models & Firestore Structure
+
+1.  Room Entities Remain Unchanged: Existing Room entities will be the primary local data models.
+
+2.  Add Sync-Related Fields to Room Entities:
+    *   For each Room entity that needs syncing, add:
+        *   lastModified: Long (timestamp, updated on local create/update).
+        *   isSynced: Boolean (optional: flag for latest local changes pushed to Firebase).
+        *   firebaseId: String? (optional: to store Firebase document ID if different from local ID).
+    *   This will require new Room database migrations.
+
+3.  Firestore Data Structure:
+    *   Data in Firestore structured per user using Firebase UID:
+        *   users/{userId}/work_activities/{local_room_id}
+        *   users/{userId}/production_activities/{local_room_id}
+        *   users/{userId}/the_boys/{local_room_id_or_boyId}
+        *   users/{userId}/activity_categories/{local_room_id_or_categoryId}
+    *   Firestore documents should mirror Room entities, including lastModified. Using local Room PK as Firestore document ID is often simpler.
+
+Phase 3: Repository Layer Enhancements
+
+1.  Existing Room Repositories:
+    *   Continue to interact with Room DAOs.
+    *   When data is written/updated:
+        *   Update lastModified timestamp in the Room entity.
+        *   Set isSynced = false (if used).
+
+2.  New Firebase Interaction Layer (e.g., FirebaseDataSource or FirebaseSyncManager):
+    *   Responsible for all direct communication with Firestore.
+    *   Functions to:
+        *   Fetch all/changed data for an entity type from Firestore (for current user).
+        *   Write/update individual entities to Firestore (for current user).
+        *   Delete entities from Firestore (for current user).
+    *   Used exclusively by the Syncing Mechanism.
+
+Phase 4: Syncing Mechanism (Background Service)
+
+1.  Implement a Sync Service (using WorkManager):
+    *   Create a periodic worker (e.g., runs every 30 seconds if app is active/user signed in).
+    *   Worker executes only if Firebase UID is available.
+
+2.  Sync Logic (Two-Way):
+    *   On Sync Trigger (Worker execution):
+        1.  Fetch Remote Changes (Firebase to Room):
+            *   For each entity type:
+                *   Query Firestore (users/{userId}/entity_type/) for records with lastModified > last successful sync timestamp for that entity type (store last sync timestamp locally).
+                *   For each new/updated Firebase record:
+                    *   If not in Room, insert (set isSynced = true if used).
+                    *   If in Room & Firebase version newer (by lastModified), update Room (set isSynced = true if used).
+        2.  Push Local Changes (Room to Firebase):
+            *   For each entity type:
+                *   Query Room for records (isSynced = false OR local lastModified is newer).
+                *   For each new/updated local record:
+                    *   Push to Firestore (users/{userId}/entity_type/{local_room_id}), updating its lastModified in Firestore.
+                    *   On success, update local record's isSynced = true (if used).
+        3.  Handle Deletions:
+            *   Requires soft-delete in Room (e.g., isDeleted flag) or a separate "to_be_deleted_from_firebase" table.
+            *   Push these deletions to Firebase during sync.
+    *   Conflict Resolution: Simplest is "last write wins" based on lastModified.
+    *   Update Last Sync Timestamps: After a successful sync cycle, update overall last sync timestamp and/or per-entity type timestamps.
+
+Phase 5: ViewModel and UI Layer (Minimal Direct Changes)
+
+1.  ViewModels: Continue to interact with Room-backed repositories. UI updates reactively.
+
+2.  UI:
+    *   SignInScreen and sign-out are main new UI.
+    *   Consider visual indicator for "syncing status" or "last synced time."
+
+Phase 6: Firebase Security Rules
+
+1.  Implement Firestore security rules:
+    *   Users can only read/write data under their own users/{userId}/ path.
+    *   Validate data integrity (e.g., lastModified timestamps).
+
+Database Migrations for Room (Reiteration):
+*   Create new Room migrations for the added sync-related fields (lastModified, isSynced, firebaseId) in existing tables.

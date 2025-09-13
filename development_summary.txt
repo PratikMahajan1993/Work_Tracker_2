@@ -1,0 +1,52 @@
+**Project: Work Tracker - Enhancements to Work Details Logging**
+
+**Phase 1: Adding New Fields to Database and State**
+1.  **Updated `WorkActivityLog.kt` (Room Entity):**
+    *   Added new fields: `logDate` (Long, for timestamp), `taskSuccessful` (Boolean, nullable), and `assignedBy` (String, nullable).
+2.  **Updated `AppDatabase.kt`:**
+    *   Incremented database version from 2 to 3.
+    *   Implemented `MIGRATION_2_3` to add the new columns (`logDate`, `taskSuccessful`, `assignedBy`) to the `work_activity_logs` table using `ALTER TABLE` SQL commands. The `logDate` was given a default value of the current time for existing rows.
+3.  **Updated `DatabaseModule.kt`:**
+    *   Ensured the new `MIGRATION_2_3` was added to the Room database builder.
+4.  **Updated `WorkDetailsState.kt`:**
+    *   Added corresponding fields: `logDate` (Long), `taskSuccessful` (Boolean?), and `assignedBy` (String).
+
+**Phase 2: ViewModel Updates**
+1.  **Updated `GenericWorkDetailsViewModel.kt`:**
+    *   Modified `uiState` to reflect the new fields from `WorkDetailsState`.
+    *   Added new public functions: `onTaskSuccessChanged(isSuccess: Boolean)` and `onAssignedByChanged(assignee: String)` to update the state.
+    *   Updated `saveWorkActivityLog()` to retrieve the new fields from the `uiState` and include them when creating/saving a `WorkActivityLog` instance.
+    *   Ensured `logDate` is initialized (e.g., to `System.currentTimeMillis()`) when a new log entry is effectively started or when the ViewModel is initialized for a new entry.
+
+**Phase 3: UI Updates (`WorkDetailsScreen.kt`)**
+1.  Added UI elements to display and interact with the new fields:
+    *   A non-editable `Text` composable to display the `logDate` (formatted as "dd MMM yyyy").
+    *   A `Row` of `RadioButton`s for "Task Successful?" (Yes/No).
+    *   A `Row` of `RadioButton`s for "Assigned By" ("TOP MGT", "CEO", "SELF").
+2.  Ensured these new UI elements are enabled/disabled based on `state.startTime != null`, consistent with other fields.
+3.  Introduced `AssignedByOptions` object and a helper `RadioButtonWithText` composable.
+
+**Phase 4: Connecting UI Actions and Refactoring**
+1.  **Updated `WorkDetailsActions.kt`:**
+    *   Added new action callbacks: `onTaskSuccessChanged: (Boolean) -> Unit` and `onAssignedByChanged: (String) -> Unit`.
+2.  **Updated `WorkDetailsCoordinator.kt`:**
+    *   Added new public functions (`onTaskSuccessChanged`, `onAssignedByChanged`) to delegate calls to the ViewModel.
+    *   Corrected a string template issue in `Toast.makeText` to properly display `categoryName`.
+3.  **Updated `WorkDetailsRoute.kt`:**
+    *   Updated the instantiation of `WorkDetailsActions` to map the new UI actions to the corresponding methods in `WorkDetailsCoordinator`.
+    *   Initially, `WorkDetailsActions` was temporarily moved here, then refactored to be solely in `WorkDetailsActions.kt`.
+
+**Phase 5: Build Configuration and Troubleshooting**
+1.  **Updated `gradle/libs.versions.toml`:**
+    *   Added `composeVersion = "1.6.11"`.
+2.  **Updated `app/build.gradle.kts`:**
+    *   Resolved a deprecation warning by migrating `kotlinOptions { jvmTarget = "..." }` to the new `kotlin { compilerOptions { jvmTarget.set(...) } }` DSL.
+3.  **Error Resolution & Iterative Refinement:**
+    *   Addressed multiple build failures due to:
+        *   Syntax errors in `WorkDetailsScreen.kt` from incorrect newline escaping during file writes.
+        *   Redeclaration of the `WorkDetailsActions` data class (initially in `WorkDetailsScreen.kt` and then also in `WorkDetailsRoute.kt` before being consolidated to `WorkDetailsActions.kt`).
+        *   Incorrect and incomplete definitions of `WorkDetailsActions` leading to "unresolved reference" errors.
+        *   Incorrect string template escaping (`${'\'$\''}{...}` instead of `${...}`) in various Kotlin files, which caused syntax errors and runtime issues (like the Toast message).
+4.  **Performed several Gradle Sync, Clean, and Build cycles** throughout the process to ensure changes were correctly integrated and to identify and fix compilation issues.
+
+The overall goal was to extend the functionality of the work details logging screen, which involved modifications across the database, data layer, ViewModel, UI, and navigation/coordination components, along with necessary build script updates and iterative debugging.

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work Tracker - Project Summary</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; margin: 0; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3, h4 { color: #333; }
+        h1 { text-align: center; color: #2a3f54; }
+        h2 { border-bottom: 2px solid #2a3f54; padding-bottom: 5px; margin-top: 30px; }
+        h3 { margin-top: 20px; color: #17a2b8; }
+        h4 { color: #6c757d; }
+        code { background-color: #e9ecef; padding: 0.2em 0.4em; margin: 0; font-size: 85%; border-radius: 3px; font-family: monospace; }
+        pre { background-color: #e9ecef; padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
+        ul { list-style-type: disc; margin-left: 20px; }
+        li { margin-bottom: 5px; }
+        .note { background-color: #ffffe0; border-left: 5px solid #f0ad4e; padding: 10px; margin-top: 10px; }
+        .code-block { background-color: #272822; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow-x: auto; font-family: monospace; }
+        .code-block .comment { color: #75715e; }
+        .code-block .keyword { color: #f92672; }
+        .code-block .string { color: #e6db74; }
+        .code-block .class-name { color: #a6e22e; }
+        .code-block .package { color: #66d9ef; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Project Summary: Work Tracker</h1>
+
+        <p>This document provides a detailed and meticulous overview of the Work Tracker Android application, covering its structure, coding practices, and data management.</p>
+
+        <h2>1) Complete App Structure</h2>
+
+        <h3>a) Brief App Route Map</h3>
+        <p>The Work Tracker application allows users to log work activities across different categories, manage details for these activities (like description, operator, expenses), view activity history, generate reports (including SMS and PDF exports), and manage application preferences (like passwords, API keys, and operator information).</p>
+        <p>The app starts with a <code>MainActivity</code> that sets up the primary navigation. The main UI is encapsulated within a <code>MainScreen</code> which uses a bottom navigation bar to switch between major sections: Dashboard, History, Reports, ChatBot (placeholder), and Preferences. From the Dashboard or History, users can navigate to a dedicated flow for logging new work activities, starting with category selection (<code>LogWorkActivityScreen</code>) and then proceeding to detail entry (<code>WorkDetailsScreen</code>). A separate <code>ViewLogsScreen</code> is also available for a tabular view of logs, filterable by operator ID.</p>
+
+        <h3>b) App Navigation Routes</h3>
+        <p>The app utilizes Jetpack Navigation Compose with two main NavHosts:</p>
+        <h4>1. Top-Level Navigation (in <code>MainActivity</code>):</h4>
+        <ul>
+            <li><code>AppRoutes.MAIN_SCREEN</code> ("mainScreen"): <strong>Start Destination</strong>. Loads <code>MainScreen</code>.</li>
+            <li><code>AppRoutes.LOG_WORK_ACTIVITY</code> ("logWorkActivity"): Navigates to <code>LogWorkActivityScreen</code>.
+                <ul><li>Triggered from <code>DashboardScreen</code> or <code>HistoryScreen</code>.</li></ul>
+            </li>
+            <li><code>ROUTE_WORK_DETAILS</code> ("work_details/{categoryName}"): Navigates to <code>WorkDetailsRoute</code> (which then displays <code>WorkDetailsScreen</code>), passing <code>categoryName</code> as an argument.
+                <ul><li>Triggered from <code>LogWorkActivityScreen</code> after category selection.</li></ul>
+            </li>
+            <li><code>AppRoutes.VIEW_LOGS</code> ("viewLogs"): Navigates to <code>ViewLogsScreen</code>. (Currently, no direct UI element seems to navigate here, it might be for future use or internal navigation).</li>
+        </ul>
+
+        <h4>2. Bottom Navigation (within <code>MainScreen</code>):</h4>
+        <ul>
+            <li><code>BottomNavScreen.Dashboard.route</code> ("dashboard"): <strong>Start Destination</strong> for <code>MainScreen</code>. Loads <code>DashboardScreen</code>.</li>
+            <li><code>BottomNavScreen.History.route</code> ("history"): Loads <code>HistoryScreen</code>.</li>
+            <li><code>BottomNavScreen.Reports.route</code> ("reports"): Loads <code>ReportsHubScreen</code>.</li>
+            <li><code>BottomNavScreen.ChatBot.route</code> ("chatbot"): Loads a placeholder Text composable.</li>
+            <li><code>BottomNavScreen.Preferences.route</code> ("preferences_route"): Loads <code>PreferencesScreen</code>.</li>
+        </ul>
+
+        <h3>c) Details of Various Screens</h3>
+        <h4>Top-Level Navigable Screens (from <code>MainActivity</code>):</h4>
+        <ol>
+            <li>
+                <strong><code>MainScreen</code></strong> (<code>com.example.worktracker.ui.MainScreen.kt</code>)
+                <ul>
+                    <li><strong>Purpose:</strong> Acts as the primary container for the app's main sections, utilizing a bottom navigation bar.</li>
+                    <li><strong>UI:</strong> <code>Scaffold</code> with a <code>NavigationBar</code> hosting <code>DashboardScreen</code>, <code>HistoryScreen</code>, <code>ReportsHubScreen</code>, <code>ChatBotScreen</code> (placeholder), and <code>PreferencesScreen</code>.</li>
+                    <li><strong>Navigation:</strong> Manages navigation between these five sections using its own <code>NavHostController</code>. Passes the <code>MainActivity</code>'s <code>NavController</code> to child screens that need to trigger top-level navigation (e.g., to <code>LogWorkActivityScreen</code>).</li>
+                </ul>
+            </li>
+            <li>
+                <strong><code>LogWorkActivityScreen</code></strong> (<code>com.example.worktracker.ui.logwork.LogWorkActivityScreen.kt</code>)
+                <ul>
+                    <li><strong>Purpose:</strong> Allows users to select a category for the work activity they intend to log.</li>
+                    <li><strong>UI:</strong> <code>Scaffold</code> with a <code>TopAppBar</code>. Displays a <code>LazyColumn</code> of <code>Button</code>s, each representing an activity category. Buttons for ongoing activities are highlighted (e.g., green). Shows a <code>CircularProgressIndicator</code> if loading or a "No activity categories available" message.</li>
+                    <li><strong>Interaction:</strong> Selecting a category navigates to <code>WorkDetailsScreen</code> with the chosen category name.</li>
+                    <li><strong>ViewModel:</strong> <code>LogWorkViewModel</code>. UI State: <code>LogWorkUiState</code> (contains <code>isLoading</code>, <code>categories</code>).</li>
+                </ul>
+            </li>
+            <li>
+                <strong><code>WorkDetailsRoute</code> & <code>WorkDetailsScreen</code></strong>
+                <ul>
+                    <li><strong><code>WorkDetailsRoute</code></strong> (<code>com.example.worktracker.ui.screens.workdetails.WorkDetailsRoute.kt</code>):
+                        <ul>
+                            <li><strong>Purpose:</strong> Composable responsible for setting up the <code>WorkDetailsScreen</code> and providing it with the necessary ViewModel (<code>GenericWorkDetailsViewModel</code>), state, and actions via a <code>WorkDetailsCoordinator</code>. It extracts the <code>categoryName</code> from navigation arguments.</li>
+                        </ul>
+                    </li>
+                    <li><strong><code>WorkDetailsScreen</code></strong> (<code>com.example.worktracker.ui.screens.workdetails.WorkDetailsScreen.kt</code>):
+                        <ul>
+                            <li><strong>Purpose:</strong> Enables users to input and manage the details of a specific work activity. It handles starting, tracking, and ending an activity.</li>
+                            <li><strong>UI:</strong> <code>Scaffold</code> with a <code>TopAppBar</code> showing the category name and a back button. Contains: Date display; Time information section ("Start" button, start time, end time, live duration); Input fields ("Description", "Operator ID", "Expenses"); Radio button groups ("Task Successful?", "Assigned By:"); "End Activity & Save" button. Displays errors and loading indicators.</li>
+                            <li><strong>ViewModel:</strong> <code>GenericWorkDetailsViewModel</code>. UI State: <code>WorkDetailsState</code>. Actions: <code>WorkDetailsActions</code>.</li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+            <li>
+                <strong><code>ViewLogsScreen</code></strong> (<code>com.example.worktracker.ui.viewlogs.ViewLogsScreen.kt</code>)
+                <ul>
+                    <li><strong>Purpose:</strong> Provides a tabular display of all work activity logs, with an option to filter by Operator ID.</li>
+                    <li><strong>UI:</strong> <code>Scaffold</code> with a <code>TopAppBar</code> and back button. Contains: An <code>OutlinedTextField</code> for "Filter by Operator ID"; A <code>LogsTable</code> (using <code>LazyColumn</code>) with columns: "Sr.No.", "Date", "Activity", "Duration", "Op.ID". Shows loading indicator or "No logs found..." message.</li>
+                    <li><strong>ViewModel:</strong> <code>ViewLogsViewModel</code>. UI State: <code>ViewLogsUiState</code>.</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h4>Screens within <code>MainScreen</code> (Bottom Navigation):</h4>
+        <ol>
+            <li>
+                <strong><code>DashboardScreen</code></strong> (<code>com.example.worktracker.ui.screens.dashboard.DashboardScreen.kt</code>)
+                <ul>
+                    <li><strong>Purpose:</strong> The landing screen. Provides a quick overview of ongoing/recent activities and a shortcut to log new work.</li>
+                    <li><strong>UI:</strong> If empty, shows welcome message and "Log Your First Activity" button. Otherwise, "Log New Activity" button, lists of "Ongoing Activities" and "Recent Work" (using <code>WorkLogDashboardItem</code> cards).</li>
+                    <li><strong>Interaction:</strong> "Log" buttons navigate to <code>LogWorkActivityScreen</code>.</li>
+                    <li><strong>ViewModel:</strong> <code>DashboardViewModel</code>. UI State: <code>DashboardUiState</code>.</li>
+                </ul>
+            </li>
+            <li>
+                <strong><code>HistoryScreen</code></strong> (<code>com.example.worktracker.ui.screens.history.HistoryScreen.kt</code>)
+                <ul>
+                    <li><strong>Purpose:</strong> Displays a comprehensive list of all past work activity logs.</li>
+                    <li><strong>UI:</strong> If empty, shows message and "Log Your First Activity" button. Otherwise, a <code>LazyColumn</code> of <code>WorkLogItem</code> cards.</li>
+                    <li><strong>Interaction:</strong> "Log" button navigates to <code>LogWorkActivityScreen</code>.</li>
+                    <li><strong>ViewModel:</strong> <code>HistoryViewModel</code>. UI State: <code>HistoryUiState</code>.</li>
+                </ul>
+            </li>
+            <li>
+                <strong><code>ReportsHubScreen</code></strong> (<code>com.example.worktracker.ui.reports.ReportsHubScreen.kt</code>)
+                <ul>
+                    <li><strong>Purpose:</strong> Central hub for generating reports and performing analyses.</li>
+                    <li><strong>UI:</strong> <code>ModalNavigationDrawer</code> (drawer for recent logs for PDF export via <code>ReportsDrawerContent</code> and <code>ExportConfirmationDialog</code>). Main screen has <code>ActionCard</code>s for "Send Activity Details (Text)" (uses <code>SelectLogForSmsDialog</code>), and placeholders for "Analyze Expenses", "Analyze Operator Activity vs Free Time", "Analyze Misc Prompt".</li>
+                    <li><strong>Interaction:</strong> Handles PDF export, SMS intent generation.</li>
+                    <li><strong>ViewModel:</strong> <code>ReportsViewModel</code>. UI State: <code>ReportsUiState</code>. Event Flow: <code>PdfExportEvent</code>.</li>
+                </ul>
+            </li>
+            <li>
+                <strong>ChatBot Screen</strong> (Placeholder in <code>com.example.worktracker.ui.MainScreen.kt</code>)
+                <ul>
+                    <li><strong>Purpose:</strong> Intended for a chatbot feature.</li>
+                    <li><strong>UI:</strong> Currently displays <code>Text("ChatBot Screen (Coming Soon!)")</code>.</li>
+                </ul>
+            </li>
+            <li>
+                <strong><code>PreferencesScreen</code></strong> (<code>com.example.worktracker.ui.screens.preferences.PreferencesScreen.kt</code>)
+                <ul>
+                    <li><strong>Purpose:</strong> Allows users to manage application-wide settings.</li>
+                    <li><strong>UI:</strong> Sections/buttons for: Master Reset Password (<code>SetPasswordDialog</code>, <code>ConfirmActionPasswordDialog</code>); Preferred SMS Contact (<code>SetSmsContactDialog</code>); Gemini API Key (<code>SetGeminiApiKeyDialog</code>); Operator Management (unlocks with <code>OperatorPasswordDialog</code> to show <code>OperatorListDialog</code> for Add/Edit/Delete using <code>AddOperatorDialog</code>, <code>EditOperatorDialog</code>, <code>AlertDialog</code>); Master Reset button.</li>
+                    <li><strong>ViewModel:</strong> <code>PreferencesViewModel</code>. UI State: <code>PreferencesUiState</code>.</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h3>d) Complete File Directory with Comments</h3>
+        <div class="code-block">
+        <pre>
+C:/Users/asus/AndroidStudioProjects/WorkTracker/
+├── app/
+│   ├── build.gradle.kts                <span class="comment"># App module build configuration, dependencies</span>
+│   ├── src/
+│   │   ├── androidTest/              <span class="comment"># Instrumented tests</span>
+│   │   ├── main/
+│   │   │   ├── AndroidManifest.xml     <span class="comment"># Core app settings, permissions, activities</span>
+│   │   │   ├── java/
+│   │   │   │   └── com/example/worktracker/
+│   │   │   │       ├── <span class="package">core</span>/                       <span class="comment"># Core utility classes (e.g., PdfGenerator.kt)</span>
+│   │   │   │       │   └── <span class="class-name">PdfGenerator.kt</span>
+│   │   │   │       ├── <span class="package">data</span>/                       <span class="comment"># Data layer: Repositories, Database</span>
+│   │   │   │       │   ├── <span class="package">database</span>/               <span class="comment"># Room DB components</span>
+│   │   │   │       │   │   ├── <span class="package">dao</span>/                <span class="comment"># Data Access Objects</span>
+│   │   │   │       │   │   │   ├── <span class="class-name">OperatorInfoDao.kt</span>
+│   │   │   │       │   │   │   └── <span class="class-name">WorkActivityDao.kt</span>
+│   │   │   │       │   │   ├── <span class="package">entity</span>/             <span class="comment"># Room Entities (Tables)</span>
+│   │   │   │       │   │   │   ├── <span class="class-name">OperatorInfo.kt</span>
+│   │   │   │       │   │   │   └── <span class="class-name">WorkActivityLog.kt</span>
+│   │   │   │       │   │   ├── <span class="class-name">AppDatabase.kt</span>      <span class="comment"># Room Database class definition</span>
+│   │   │   │       │   │   ├── <span class="class-name">WorkLog.kt</span>          <span class="comment"># Likely OLD/UNUSED entity</span>
+│   │   │   │       │   │   └── <span class="class-name">WorkLogDao.kt</span>       <span class="comment"># Likely OLD/UNUSED DAO</span>
+│   │   │   │       │   └── <span class="package">repository</span>/             <span class="comment"># Repository pattern implementations</span>
+│   │   │   │       │       ├── <span class="class-name">OperatorRepository.kt</span>
+│   │   │   │       │       └── <span class="class-name">WorkActivityRepository.kt</span> <span class="comment"># Contains Interface & Impl</span>
+│   │   │   │       ├── <span class="package">di</span>/                         <span class="comment"># Dependency Injection (Hilt)</span>
+│   │   │   │       │   └── <span class="class-name">AppModule.kt</span>            <span class="comment"># Hilt module for app-wide dependencies</span>
+│   │   │   │       ├── <span class="package">navigation</span>/                 <span class="comment"># Navigation-specific definitions</span>
+│   │   │   │       │   └── <span class="class-name">BottomNavScreen.kt</span>      <span class="comment"># Defines bottom navigation items</span>
+│   │   │   │       ├── <span class="package">ui</span>/                         <span class="comment"># UI Layer: Screens, ViewModels, Composables</span>
+│   │   │   │       │   ├── <span class="package">components</span>/             <span class="comment"># Reusable UI dialogs and components</span>
+│   │   │   │       │   │   ├── <span class="class-name">ConfirmActionPasswordDialog.kt</span>
+│   │   │   │       │   │   ├── <span class="class-name">EditOperatorDialog.kt</span>
+│   │   │   │       │   │   ├── <span class="class-name">OperatorListDialog.kt</span>
+│   │   │   │       │   │   ├── <span class="class-name">OperatorPasswordDialog.kt</span>
+│   │   │   │       │   │   ├── <span class="class-name">AddOperatorDialog.kt</span>
+│   │   │   │       │   │   ├── <span class="class-name">SetGeminiApiKeyDialog.kt</span>
+│   │   │   │       │   │   ├── <span class="class-name">SetPasswordDialog.kt</span>
+│   │   │   │       │   │   └── <span class="class-name">SetSmsContactDialog.kt</span>
+│   │   │   │       │   ├── <span class="package">logwork</span>/                <span class="comment"># Log Work Activity feature</span>
+│   │   │   │       │   │   ├── <span class="class-name">LogWorkActivityScreen.kt</span> <span class="comment"># Category selection</span>
+│   │   │   │       │   │   └── <span class="class-name">LogWorkViewModel.kt</span>
+│   │   │   │       │   ├── <span class="package">reports</span>/                <span class="comment"># Reports feature</span>
+│   │   │   │       │   │   ├── <span class="class-name">ExportConfirmationDialog.kt</span>
+│   │   │   │       │   │   ├── <span class="class-name">ReportsDrawerContent.kt</span> <span class="comment"># (Inferred)</span>
+│   │   │   │       │   │   ├── <span class="class-name">ReportsHubScreen.kt</span>
+│   │   │   │       │   │   ├── <span class="class-name">ReportsViewModel.kt</span>
+│   │   │   │       │   │   └── <span class="class-name">SelectLogForSmsDialog.kt</span>
+│   │   │   │       │   ├── <span class="package">screens</span>/                <span class="comment"># Main content screens</span>
+│   │   │   │       │   │   ├── <span class="package">dashboard</span>/
+│   │   │   │       │   │   │   ├── <span class="class-name">DashboardScreen.kt</span>
+│   │   │   │       │   │   │   └── <span class="class-name">DashboardViewModel.kt</span>
+│   │   │   │       │   │   ├── <span class="package">history</span>/
+│   │   │   │       │   │   │   ├── <span class="class-name">HistoryScreen.kt</span>
+│   │   │   │       │   │   │   └── <span class="class-name">HistoryViewModel.kt</span>
+│   │   │   │       │   │   ├── <span class="package">preferences</span>/
+│   │   │   │       │   │   │   ├── <span class="class-name">PreferencesScreen.kt</span>
+│   │   │   │       │   │   │   └── <span class="class-name">PreferencesViewModel.kt</span>
+│   │   │   │       │   │   └── <span class="package">workdetails</span>/
+│   │   │   │       │   │       ├── <span class="class-name">GenericWorkDetailsViewModel.kt</span> <span class="comment"># (Inferred)</span>
+│   │   │   │       │   │       ├── <span class="class-name">WorkDetailsActions.kt</span> <span class="comment"># (Inferred)</span>
+│   │   │   │       │   │       ├── <span class="class-name">WorkDetailsCoordinator.kt</span> <span class="comment"># (Inferred)</span>
+│   │   │   │       │   │       ├── <span class="class-name">WorkDetailsModels.kt</span> <span class="comment"># (Inferred, for WorkDetailsState)</span>
+│   │   │   │       │   │       ├── <span class="class-name">WorkDetailsRoute.kt</span>
+│   │   │   │       │   │       └── <span class="class-name">WorkDetailsScreen.kt</span>
+│   │   │   │       │   ├── <span class="package">theme</span>/                  <span class="comment"># Jetpack Compose Theme</span>
+│   │   │   │       │   │   ├── <span class="class-name">Color.kt</span>
+│   │   │   │       │   │   ├── <span class="class-name">Theme.kt</span>
+│   │   │   │       │   │   └── <span class="class-name">Type.kt</span>
+│   │   │   │       │   ├── <span class="package">viewlogs</span>/               <span class="comment"># View Logs in table feature</span>
+│   │   │   │       │   │   ├── <span class="class-name">ViewLogsScreen.kt</span>
+│   │   │   │       │   │   ├── <span class="class-name">ViewLogsViewModel.kt</span>
+│   │   │   │       │   │   └── <span class="class-name">LogDisplayInfo.kt</span> <span class="comment"># (Inferred)</span>
+│   │   │   │       │   └── <span class="class-name">MainScreen.kt</span>           <span class="comment"># Hosts bottom navigation</span>
+│   │   │   │       ├── <span class="class-name">GeminiProService.kt</span>         <span class="comment"># Service for Gemini AI interaction</span>
+│   │   │   │       ├── <span class="class-name">MainActivity.kt</span>             <span class="comment"># Main Activity, hosts top-level NavHost</span>
+│   │   │   │       └── <span class="class-name">MyApplication.kt</span>          <span class="comment"># Application class (for Hilt init)</span>
+│   │   │   └── res/                      <span class="comment"># Android resources</span>
+│   │   └── test/                       <span class="comment"># Unit tests</span>
+├── build.gradle.kts                    <span class="comment"># Project-level build configuration</span>
+├── gradle/
+│   └── libs.versions.toml              <span class="comment"># Gradle Version Catalog for dependencies</span>
+├── gradle.properties                   <span class="comment"># Project-specific Gradle properties</span>
+└── settings.gradle.kts                 <span class="comment"># Defines project modules</span>
+</pre>
+        </div>
+        <p class="note"><em>(Inferred files/directories are based on import statements or typical project structure when not explicitly read)</em></p>
+
+        <h3>e) Any other details that might help with understanding the App</h3>
+        <ul>
+            <li><strong>Kotlin & Jetpack Compose:</strong> The app is built entirely using Kotlin and Jetpack Compose for the UI.</li>
+            <li><strong>Material Design 3:</strong> Utilizes Material 3 components and theming.</li>
+            <li><strong>Hilt:</strong> Used for dependency injection throughout the app.</li>
+            <li><strong>Coroutines & Flow:</strong> Asynchronous operations and state management heavily rely on Kotlin Coroutines and StateFlow/Flow.</li>
+            <li><strong>Single Activity Architecture:</strong> The app uses a single <code>MainActivity</code> which hosts various composable screens managed by Jetpack Navigation.</li>
+            <li><strong>ViewModel per Screen/Feature:</strong> Each major screen or feature has its own ViewModel to manage its state and business logic.</li>
+            <li><strong>Centralized SharedPreferences:</strong> Settings like master password, SMS contact, and Gemini API key are stored in SharedPreferences, managed via <code>AppModule.kt</code>.</li>
+        </ul>
+
+        <h2>2) Coding conventions and techniques used</h2>
+
+        <h3>a) List of all the good practises used in the architecture</h3>
+        <ul>
+            <li><strong>MVVM (Model-View-ViewModel) Architecture:</strong> Clear separation of UI (Composable Screens), State/Logic (ViewModels), and Data (Repositories).</li>
+            <li><strong>Dependency Injection with Hilt:</strong> Simplifies dependency management and improves testability.</li>
+            <li><strong>Repository Pattern:</strong> Abstracts data sources (Room DB, SharedPreferences) from ViewModels.</li>
+            <li><strong>Single Source of Truth:</strong> ViewModels expose UI state via <code>StateFlow</code>, which is the single source of truth for the UI.</li>
+            <li><strong>Immutability for UI State:</strong> UI state objects (e.g., <code>LogWorkUiState</code>, <code>WorkDetailsState</code>) are typically data classes, promoting unidirectional data flow.</li>
+            <li><strong>Use of Kotlin Coroutines and Flow:</strong> For efficient asynchronous programming and reactive updates.</li>
+            <li><strong>Jetpack Compose for UI:</strong> Modern, declarative UI toolkit.</li>
+            <li><strong>Jetpack Navigation Compose:</strong> For structured and type-safe navigation.</li>
+            <li><strong>Room for Local Persistence:</strong> Robust and type-safe database interaction.</li>
+            <li><strong>Sealed Classes for Events/States:</strong> Used for defining navigation routes (<code>BottomNavScreen</code>) and ViewModel events (e.g., <code>PdfExportEvent</code>).</li>
+            <li><strong>Modular UI Components:</strong> Screens are broken down into smaller, reusable composables (e.g., <code>WorkLogItem</code>, dialogs in <code>ui.components</code>).</li>
+            <li><strong>Centralized Dependency Versioning:</strong> Use of <code>libs.versions.toml</code> (Gradle Version Catalog).</li>
+            <li><strong>Clear Package Structure:</strong> Code is organized by feature (e.g., <code>logwork</code>, <code>reports</code>, <code>preferences</code>) and layer (e.g., <code>data</code>, <code>ui</code>, <code>di</code>).</li>
+        </ul>
+
+        <h3>b) Details about things like Hilt DI etc. being used.</h3>
+        <ul>
+            <li><strong>Hilt Setup:</strong>
+                <ul>
+                    <li><code>@HiltAndroidApp</code> on <code>MyApplication.kt</code> to initialize Hilt.</li>
+                    <li><code>@AndroidEntryPoint</code> on <code>MainActivity</code> to enable field injection.</li>
+                    <li><code>@HiltViewModel</code> on all ViewModel classes to enable their creation and injection.</li>
+                </ul>
+            </li>
+            <li><strong>Modules:</strong>
+                <ul>
+                    <li><code>AppModule.kt</code> (<code>@Module</code>, <code>@InstallIn(SingletonComponent::class)</code>) is the primary Hilt module.</li>
+                    <li>It provides singletons for <code>SharedPreferences</code>, <code>AppDatabase</code>, <code>WorkActivityDao</code>, <code>OperatorInfoDao</code>, <code>WorkActivityRepository</code>, <code>OperatorRepository</code>, and <code>GeminiProService</code>.</li>
+                </ul>
+            </li>
+            <li><strong>Injection:</strong> Dependencies are constructor-injected (e.g., DAOs into Repositories, Repositories/SharedPreferences into ViewModels).</li>
+        </ul>
+
+        <h3>c) Details about the UI (Mention what libraries and practises are used)</h3>
+        <ul>
+            <li><strong>Core UI Library:</strong> <strong>Jetpack Compose</strong>.</li>
+            <li><strong>UI Design System:</strong> <strong>Material Design 3</strong>. Evident from use of <code>MaterialTheme</code> and components like <code>Scaffold</code>, <code>TopAppBar</code>, <code>NavigationBar</code>, <code>Button</code>, <code>Card</code>, <code>AlertDialog</code>, etc.</li>
+            <li><strong>Layout Composables:</strong> <code>Column</code>, <code>Row</code>, <code>Box</code>, <code>Spacer</code>, <code>LazyColumn</code>.</li>
+            <li><strong>Modifiers:</strong> Extensively used for styling, sizing, padding, arrangement, and event handling.</li>
+            <li><strong>State Hoisting:</strong> UI state owned by ViewModels, passed to Composables, which emit events upwards. <code>collectAsState()</code> used to observe <code>StateFlow</code>.</li>
+            <li><strong>Animation:</strong> <code>AnimatedVisibility</code>, <code>fadeIn</code>, <code>fadeOut</code> for screen transitions and conditional UI.</li>
+            <li><strong>Navigation:</strong> Jetpack Navigation Compose with <code>NavHostController</code>.</li>
+            <li><strong>Dialogs:</strong> Standard <code>AlertDialog</code> and custom Composable dialogs, managed via ViewModel UI states. Many custom dialogs in <code>com.example.worktracker.ui.components</code>.</li>
+            <li><strong>Theming:</strong> Centralized in <code>com.example.worktracker.ui.theme</code> (<code>Theme.kt</code>, <code>Color.kt</code>, <code>Type.kt</code>).</li>
+        </ul>
+
+        <h3>d) Details of Databases used to store user input. (Explain in detail)</h3>
+        <p>Two main forms of local data storage are used:</p>
+        <h4>1. Room Persistence Library (for structured data):</h4>
+        <ul>
+            <li><strong>Database Class:</strong> <code>AppDatabase.kt</code> (<code>@Database</code>)
+                <ul>
+                    <li>Version: 4</li>
+                    <li>Entities: <code>WorkActivityLog</code> and <code>OperatorInfo</code>.</li>
+                    <li>Provides <code>WorkActivityDao</code> and <code>OperatorInfoDao</code>.</li>
+                    <li>Includes <code>MIGRATION_2_3</code> for schema changes to <code>work_activity_logs</code>.</li>
+                    <li>Uses <code>fallbackToDestructiveMigration()</code> for other version changes.</li>
+                </ul>
+            </li>
+            <li><strong>Entities:</strong>
+                <ul>
+                    <li><strong><code>WorkActivityLog.kt</code></strong> (<code>@Entity(tableName = "work_activity_logs")</code>): Stores individual work log entries. Fields: <code>id</code> (PK, auto-generated Long), <code>categoryName</code> (String), <code>startTime</code> (Long), <code>endTime</code> (Long?), <code>description</code> (String), <code>operatorId</code> (Int), <code>expenses</code> (Double), <code>logDate</code> (Long), <code>taskSuccessful</code> (Boolean?), <code>assignedBy</code> (String?).</li>
+                    <li><strong><code>OperatorInfo.kt</code></strong> (<code>@Entity(tableName = "operator_info")</code>): Stores information about operators. Fields: <code>operatorId</code> (PK, Int, user-defined), <code>name</code> (String), <code>hourlySalary</code> (Double), <code>role</code> (String), <code>priority</code> (Int), <code>notes</code> (String?), <code>notesForAi</code> (String?).</li>
+                </ul>
+            </li>
+            <li><strong>DAOs (Data Access Objects):</strong>
+                <ul>
+                    <li><strong><code>WorkActivityDao.kt</code></strong>: Interface with methods to <code>insertLog</code>, <code>getAllLogs</code>, <code>getLogById</code>, <code>deleteLogById</code>, <code>clearAllLogsInternal</code>, <code>resetAutoIncrementForLogsTable</code>, <code>wipeDatabaseAndResetIds</code> (transactional), <code>getOngoingActivityByCategoryName</code>, <code>getOngoingActivities</code>, <code>getRecentLogs</code>. Uses <code>Flow</code>.</li>
+                    <li><strong><code>OperatorInfoDao.kt</code></strong>: Interface with methods to <code>insert</code>, <code>update</code>, <code>delete</code> operator, <code>getAllOperators</code>, <code>getOperatorById</code>. Uses <code>Flow</code>.</li>
+                </ul>
+            </li>
+            <li><strong>Repositories:</strong>
+                <ul>
+                    <li><strong><code>WorkActivityRepositoryImpl.kt</code></strong>: Implements <code>WorkActivityRepository</code>. Uses <code>WorkActivityDao</code>. <code>clearAllLogs</code> calls transactional <code>wipeDatabaseAndResetIds</code>.</li>
+                    <li><strong><code>OperatorRepository.kt</code></strong>: Uses <code>OperatorInfoDao</code>.</li>
+                </ul>
+            </li>
+        </ul>
+        <h4>2. SharedPreferences (for simple key-value settings):</h4>
+        <ul>
+            <li><strong>Managed in:</strong> <code>AppModule.kt</code>.</li>
+            <li><strong>File Name:</strong> "WorkTrackerUserPrefs".</li>
+            <li><strong>Purpose:</strong> Stores user-specific settings.</li>
+            <li><strong>Keys Used:</strong> <code>KEY_MASTER_PASSWORD</code>, <code>KEY_SMS_CONTACT</code>, <code>KEY_GEMINI_API_KEY</code>.</li>
+        </ul>
+
+        <h3>e) Any other details that might be helpful in future activities which will develop the app.</h3>
+        <ul>
+            <li><strong>ViewModel Structure:</strong> ViewModels typically expose a single <code>StateFlow&lt;UiState&gt;</code> and handle user actions.</li>
+            <li><strong>Error Handling:</strong> Errors communicated via <code>UiState</code> fields or Snackbar messages.</li>
+            <li><strong>AI Integration:</strong> <code>GeminiProService.kt</code> suggests integration with Google's Gemini AI. API key configurable in Preferences.</li>
+            <li><strong>Focus on Reusability:</strong> Dialogs in <code>ui.components</code> promote reuse.</li>
+            <li><strong>Handling of Ongoing Activities:</strong> System can identify and display ongoing activities.</li>
+            <li><strong>Code Maintainability:</strong> Good due to separation of concerns and modern libraries.</li>
+            <li><strong>Testability:</strong> Architecture supports unit and UI testing.</li>
+        </ul>
+
+        
+    </div>
+</body>
+</html>

@@ -1,0 +1,1 @@
+The goal is to give the employees of a machining company the means to record and document the work that they do daily. The app will remind the users after specific time intervals to log in the work that they did.

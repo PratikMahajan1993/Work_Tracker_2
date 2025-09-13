@@ -1,0 +1,185 @@
+Project Summary: Work Tracker App
+
+### 1) Complete App Structure
+
+**a) Brief App Routemap:**
+
+The application starts with a `MainScreen` which appears to be the central hub. From here, the user can navigate to different sections of the app to perform tasks like logging work, logging production, and managing components. The navigation is handled by a single `NavHost` in the `MainActivity`.
+
+**b) App Navigation Routes:**
+
+Here are the defined navigation routes from `AppRoutes.kt`:
+
+*   `main_screen`: The initial screen of the application.
+*   `select_category`: A screen for selecting a work category.
+*   `work_details/{categoryName}`: A screen that displays the details of a specific work category.
+*   `log_production_activity`: A screen for logging production activities.
+*   `manage_components`: A screen for adding or editing components.
+*   `view_components`: A screen for viewing a list of components.
+
+**c) Details of Various Screens:**
+
+*   **`MainActivity.kt`**:
+    *   **Purpose**: Main entry point of the application, hosts the primary `NavHostController`.
+    *   **Structure**: Sets up `WorkTrackerTheme` and a `Scaffold`. It defines the main `AppNavigationHost` which includes routes to `MainScreen`, `LogWorkActivityScreen`, `WorkDetailsRoute`, `LogProductionScreen`, `ManageComponentsScreen`, and `ComponentListScreen`.
+    *   **Navigation**: Manages top-level navigation between the major screens/flows of the app.
+
+*   **`AppRoutes.kt`**:
+    *   **Purpose**: Defines string constants for all navigation routes used in the app, promoting consistency and avoiding typos in route strings. Includes helper functions to build routes with arguments.
+
+*   **`BottomNavScreen.kt` (object in `navigation` package)**:
+    *   **Purpose**: Defines a sealed class hierarchy for the items in the `MainScreen`'s bottom navigation bar.
+    *   **Structure**: Each object (e.g., `Dashboard`, `History`, `Reports`, `ChatBot`, `Preferences`) holds a route string, a label, and an `ImageVector` for its icon.
+
+*   **`MainScreen.kt`**:
+    *   **Purpose**: Acts as the primary UI container after login/initial setup. It hosts a bottom navigation bar to switch between major app sections.
+    *   **Structure**: Uses a `Scaffold` with a `BottomNavigationBar`. The navigation within the `MainScreen` (i.e., switching between Dashboard, History, etc.) is handled by a nested `NavHost` (`bottomNavController`). It also receives `mainActivityNavController` to navigate to screens outside the `MainScreen`'s immediate scope (e.g., `LogWorkActivityScreen`, `LogProductionScreen`).
+    *   **Key UI Components**: `Scaffold`, `NavigationBar`, `NavigationBarItem`, nested `NavHost`.
+    *   **Navigation**:
+        *   Navigates to `DashboardScreen`, `HistoryScreen`, `ReportsHubScreen`, `ChatBotScreen` (placeholder), and `PreferencesScreen` using `bottomNavController`.
+        *   Provides navigation actions (passed as lambdas) to `DashboardScreen` and `HistoryScreen` to navigate to `AppRoutes.SELECT_CATEGORY` (for `LogWorkActivityScreen`) and `AppRoutes.LOG_PRODUCTION_ACTIVITY` using `mainActivityNavController`.
+
+*   **`DashboardScreen.kt`**:
+    *   **Purpose**: This screen serves as the main landing area within the `MainScreen`. It displays ongoing work activities, recent work logs, and provides quick actions to log new activities or production.
+    *   **Structure**: It shows a loading indicator while data is being fetched. If there's no data (no ongoing activities and no recent logs), it displays an `EmptyDashboardContent` with a welcome message and buttons to log activity/production. Otherwise, it shows `DashboardContent` which lists ongoing and recent activities.
+    *   **State Management**: Uses a `DashboardViewModel` (Hilt-injected) to manage its UI state (`uiState`), which includes `isLoading`, `ongoingActivities`, and `recentLogs`.
+    *   **Key UI Components**: `CircularProgressIndicator`, `Button`, `Card` (for `WorkLogDashboardItem`), `Icon`, `Text`. It uses `Column` and `Row` for layout.
+    *   **Navigation**: Receives `onNavigateToLogWork` and `onNavigateToLogProduction` lambdas to trigger navigation to the respective logging screens (handled by `mainActivityNavController` in `MainScreen`).
+    *   **Helper Composables**: `EmptyDashboardContent`, `DashboardContent`, `WorkLogDashboardItem`.
+    *   **Other**: Includes haptic feedback on button clicks. Formats timestamps for display.
+
+*   **`HistoryScreen.kt`**:
+    *   **Purpose**: This screen displays a historical list of all logged activities, including both operator work activities and production activities.
+    *   **Structure**: It shows a loading indicator while fetching data. If there are no historical entries, it displays an `EmptyHistoryContent` composable. Otherwise, it shows a `LogsList` (`LazyColumn`) containing items of type `HistoryListItem`.
+    *   **State Management**: Uses a `HistoryViewModel` (Hilt-injected) to manage `uiState` (`isLoading`, `historyItems`).
+    *   **Key UI Components**: `CircularProgressIndicator`, `LazyColumn`, `Button`, `Card` (for `WorkLogItem` and `ProductionLogItem`), `Icon`, `Text`.
+    *   **Navigation**: Receives `onNavigateToLogWork` and `onNavigateToLogProduction` lambdas.
+    *   **Helper Composables**: `LogsList`, `EmptyHistoryContent`, `WorkLogItem`, `ProductionLogItem`.
+    *   **Other**: Includes haptic feedback and utility functions for formatting timestamps and durations.
+
+*   **`ReportsHubScreen.kt`**:
+    *   **Purpose**: Acts as a hub for generating and exporting reports (SMS, PDF).
+    *   **Structure**: `Scaffold` with `TopAppBar`. Main content has `ActionCard`s. Conditionally displays dialogs: `SelectLogForPdfDialog`, `ExportConfirmationDialog`, `SelectLogForSmsDialog`. Uses `AnimatedVisibility` for errors.
+    *   **State Management**: Uses `ReportsViewModel` (Hilt-injected) for `uiState` and `eventFlow` for side effects like toasts or launching SMS app.
+    *   **Key UI Components**: `Scaffold`, `TopAppBar`, `SnackbarHost`, `ActionCard`, `Dialog`, `CircularProgressIndicator`, `LazyColumn`.
+    *   **Helper Composables**: `ActionCard`, `SelectLogForPdfDialog`. (Other dialogs invoked are likely in `ui.components`).
+
+*   **`PreferencesScreen.kt`**:
+    *   **Purpose**: Allows configuration of app settings, management of data (categories, components, operators, "The Boys"), and master reset.
+    *   **Structure**: Scrollable `Column` with sections for different preferences, each with `Button`s triggering actions or dialogs.
+    *   **State Management**: Uses `PreferencesViewModel` (Hilt-injected) for a complex `uiState` managing dialog visibility, input fields, errors, status flags, and data lists.
+    *   **Key UI Components**: `Button`, `Text`, `HorizontalDivider`, `AlertDialog`. Relies heavily on custom dialog composables (e.g., `SetPasswordDialog`, `ManageCategoriesDialog`, `OperatorListDialog`).
+    *   **Navigation**: Navigates to `MANAGE_COMPONENTS` and `VIEW_COMPONENTS` routes.
+    *   **Settings Sections**: Password, SMS Contact, Gemini API Key, Activity Categories, Manufacturing Components, Operator Management, "The Boys" Management, Master Reset. Each section often has associated dialogs for detailed management.
+
+*   **`LogWorkActivityScreen.kt`**:
+    *   **Purpose**: Allows the user to select an activity category to log work against. First step in "Log Operator Activity" flow.
+    *   **Structure**: `Scaffold` with `TopAppBar`. Shows loading indicator or a `LazyColumn` of `Button`s for each category. Ongoing activities are highlighted.
+    *   **State Management**: Uses `LogWorkViewModel` (Hilt-injected) for `uiState` (`isLoading`, list of `categories` with `isOngoing` status).
+    *   **Key UI Components**: `Scaffold`, `TopAppBar`, `CircularProgressIndicator`, `LazyColumn`, `Button`.
+    *   **Navigation**: Invokes `onCategorySelected` lambda with the category name, which triggers navigation to `WorkDetailsRoute`.
+
+*   **`WorkDetailsRoute.kt`**:
+    *   **Purpose**: Entry point and coordinator for the "Work Details" screen. Sets up ViewModel, Coordinator, and Actions.
+    *   **Structure**: Initializes `GenericWorkDetailsViewModel`, `WorkDetailsCoordinator`, and `WorkDetailsActions`. Passes these to `WorkDetailsScreen`.
+    *   **Navigation**: `categoryName` passed via route. `WorkDetailsCoordinator` handles back navigation.
+
+*   **`WorkDetailsScreen.kt`**:
+    *   **Purpose**: Logs details of a work activity for a chosen category (description, operator ID, expenses, task success, assigned by, components). Displays time information.
+    *   **Structure**: `Scaffold` with `TopAppBar`. Scrollable `Column` with date display, `TimeInformationSection`, `OutlinedTextField`s, radio button groups, component selection section (with `InputChip`s and `FlowRow`), error display, loading indicator, and "End Activity & Save" button.
+    *   **State Management**: Receives `WorkDetailsState` and `WorkDetailsActions`.
+    *   **Key UI Components**: `Scaffold`, `TopAppBar`, `OutlinedTextField`, `RadioButton`, `Button`, `InputChip`, `FlowRow`, `Dialog` (via `ComponentSelectionDialog`).
+    *   **Helper Composables**: `TimeInformationSection` (with live duration update), `RadioButtonWithText`, `ComponentSelectionDialog`.
+
+*   **`LogProductionScreen.kt`**:
+    *   **Purpose**: Logs production activities (select operator "Boy", component, machine no., quantity, start time, downtime).
+    *   **Structure**: `Scaffold` with `TopAppBar` and `SnackbarHost`. Scrollable `Column` with `TheBoySelector`, `ComponentSelector` (both `ExposedDropdownMenuBox`), `OutlinedTextField`s for machine number and quantity, `ProductionTimeDetailsSection` (for time inputs and display), and "Save Activity" button.
+    *   **State Management**: Uses `LogProductionViewModel` (Hilt-injected) for `uiState` (loading flags, lists for dropdowns, selected items, input fields, errors, calculated times, snackbar message).
+    *   **Key UI Components**: `Scaffold`, `TopAppBar`, `SnackbarHost`, `ExposedDropdownMenuBox`, `OutlinedTextField`, `Button`.
+    *   **Helper Composables**: `TheBoySelector`, `ComponentSelector`, `ProductionTimeDetailsSection`, `formatDuration`.
+
+*   **`ManageComponentsScreen.kt` (in `ui/screens/preferences/components/`)**:
+    *   **Purpose**: Adds a new manufacturing component or edits an existing one.
+    *   **Structure**: `Scaffold` with `TopAppBar` (dynamic title "Add/Edit Component"). Main content is `ComponentInputForm`.
+    *   **State Management**: Uses `ManageComponentsViewModel` (Hilt-injected) for `ManageComponentsUiState` and handles `ManageComponentsUiEvent`.
+    *   **Key UI Components**: `Scaffold`, `TopAppBar`. `ComponentInputForm` contains `OutlinedTextField`s and Save/Update/Cancel buttons.
+    *   **Navigation**: Receives `onNavigateBack`. `LaunchedEffect` loads component for editing if `editingComponentId` is passed.
+
+*   **`ComponentListScreen.kt` (in `ui/screens/preferences/components/`)**:
+    *   **Purpose**: Displays a list of manufacturing components, allowing view, edit navigation, and deletion.
+    *   **Structure**: `Scaffold` with `TopAppBar`. Main content is `ActualComponentList` (a `LazyColumn`). Shows `ActualDeleteConfirmationDialog` for deletions.
+    *   **State Management**: Reuses `ManageComponentsViewModel`. `uiState` provides the list of components and manages delete confirmation dialog state.
+    *   **Key UI Components**: `Scaffold`, `TopAppBar`, `LazyColumn`, `Card`, `AlertDialog`.
+    *   **Navigation**: Navigates to `ManageComponentsScreen` for editing, passing the component ID.
+    *   **Helper Composables**: `ActualComponentList`, `ActualComponentListItem`, `ActualDeleteConfirmationDialog`.
+
+
+**e) Any other details that might help with understanding the App**
+
+*   **ViewModel Architecture**: The app heavily relies on ViewModels (e.g., `LogWorkViewModel`, `DashboardViewModel`, `GenericWorkDetailsViewModel`) to hold and manage UI state, and to expose data to Composables via `StateFlow`. User actions are typically passed from the UI to the ViewModel methods.
+*   **UI State Classes**: Dedicated data classes (e.g., `WorkDetailsState`, `ManageComponentsUiState`, `LogProductionUiState`) are used to represent the complete state of a screen, promoting unidirectional data flow.
+*   **UI Event Classes/Actions**: Some screens use dedicated classes/sealed interfaces for UI events or actions (e.g., `WorkDetailsActions`, `ManageComponentsUiEvent`) to clearly define interactions between the UI and the ViewModel/Coordinator.
+*   **Coordinators**: The `WorkDetailsScreen` uses a `WorkDetailsCoordinator` to mediate between the ViewModel and the UI, and to handle more complex logic or navigation concerns, separating these from the Composable itself.
+*   **Dialogs**: Many features, especially in `PreferencesScreen` and `ReportsHubScreen`, are implemented using Dialog Composables. These dialogs are often custom-built within the `ui.components` package or directly in the screen files.
+
+### 2) Coding Conventions and Techniques Used:
+
+**a) List of all the good practises used in the architecture**
+
+*   **MVVM-like Architecture**: Screens (Views) observe state from ViewModels. User interactions are delegated to ViewModels.
+*   **Dependency Injection (DI)**: Hilt is used for managing dependencies, particularly for injecting ViewModels (`@HiltViewModel`) and making the Application class an entry point (`@AndroidEntryPoint` on `MainActivity` and `MyApplication`).
+*   **Single Source of Truth**: ViewModels typically hold the screen state using `StateFlow`, making the state observable and the single source of truth for the UI.
+*   **Kotlin**: The entire application code inspected is written in Kotlin, leveraging its conciseness and features.
+*   **Jetpack Compose**: The UI is built entirely with Jetpack Compose, a declarative UI toolkit.
+*   **Coroutines and Flows**: Asynchronous operations and reactive data streams are handled using Kotlin Coroutines and `StateFlow`/`SharedFlow` (e.g., `viewModel.eventFlow` in `ReportsHubScreen`).
+*   **Separation of Concerns**:
+    *   UI logic is in Composables.
+    *   State management and business logic are in ViewModels.
+    *   Navigation logic is centralized in `NavHost` and route definitions (`AppRoutes`).
+    *   The `WorkDetailsCoordinator` is an example of further separating complex screen logic.
+*   **Immutability**: UI state classes (like `WorkDetailsState`) are often data classes, encouraging immutable state that is updated by creating new instances.
+*   **Modularity**:
+    *   The UI is broken down into screens and reusable components.
+    *   Features like "Log Work," "Log Production," and "Preferences" are well-encapsulated in their respective packages.
+*   **Clear Navigation Structure**: Navigation is handled by Jetpack Navigation Compose with clearly defined routes in `AppRoutes.kt`.
+*   **Error Handling**: UI states often include error fields to display messages to the user (e.g., `uiState.generalError`, field-specific errors like `uiState.componentNameError`). Snackbars and Toasts are also used for transient messages.
+
+**b) Details about things like Hilt DI etc. being used.**
+
+*   **Hilt**:
+    *   `@AndroidEntryPoint` is used on `MainActivity` (and likely on `MyApplication`).
+    *   `@HiltViewModel` is used on all ViewModel classes encountered (e.g., `ReportsViewModel`, `DashboardViewModel`, `LogProductionViewModel`, `GenericWorkDetailsViewModel`, `ManageComponentsViewModel`, `PreferencesViewModel`, `LogWorkViewModel`). This allows Hilt to provide these ViewModels with their dependencies.
+    *   Dependencies (like Repositories, Daos, or Context) are likely injected into ViewModels via their constructors.
+
+**c) Details about the UI (Mention what libraries and practises are used)**
+
+*   **Jetpack Compose**: The entire UI is built with Jetpack Compose.
+*   **Material 3**: The app uses Material 3 components and styling (`androidx.compose.material3.*`). This is evident from imports like `MaterialTheme`, `Scaffold`, `TopAppBar`, `Button`, `Card`, `OutlinedTextField`, `CircularProgressIndicator`, `Dialog`, `NavigationBar`, `ExposedDropdownMenuBox`, etc.
+*   **Layouts**: Standard Compose layouts like `Column`, `Row`, `Box`, `Spacer` are used. `LazyColumn` is used for displaying scrollable lists efficiently. `FlowRow` is used in `WorkDetailsScreen` for displaying selected components.
+*   **State Hoisting**: State is generally hoisted to the Composable's caller (often a ViewModel) and passed down, with events passed up via lambdas (e.g., `WorkDetailsScreen` taking `WorkDetailsState` and `WorkDetailsActions`).
+*   **`remember` and `mutableStateOf`**: Used for managing local Composable state.
+*   **`LaunchedEffect`**: Used for side effects tied to the Composable lifecycle or specific keys.
+*   **Modifiers**: Extensively used for styling, padding, arrangement, size, click listeners, etc.
+*   **Navigation**: Jetpack Navigation Compose (`NavHost`, `composable`, `rememberNavController`) is used.
+*   **Theming**: A custom theme `WorkTrackerTheme` is applied.
+*   **Animation**: Basic animations like `fadeIn`, `fadeOut`, `slideInVertically`, `slideOutVertically` are used with `AnimatedVisibility`. `NavHost` composables also define enter/exit transitions.
+*   **Previews**: `@Preview` annotations are used for previewing Composables.
+
+**d) Details of Databases used to store user input. (Explain in detail)**
+
+Based on the imports and common Android practices, the application uses a **Room Persistence Library** as its local database.
+
+*   **Entities**: Likely include `WorkActivityLog`, `ComponentInfo`, `OperatorInfo`, `TheBoysInfo`, and `ProductionActivity`.
+*   **DAOs (Data Access Objects)**: Interfaces defining methods for database interactions.
+*   **Database Class**: An `@Database` annotated class (likely `AppDatabase.kt`) defining the database, entities, and DAO access.
+*   **Usage**: ViewModels interact with DAOs (likely via Repositories) to fetch and persist user data.
+
+**e) Any other details that might be helpful in future activities which will develop the app.**
+
+*   **ViewModel-UI Communication**: Consistent pattern of `StateFlow` for UI state and public methods/`SharedFlow` for events.
+*   **Clear State Representation**: Dedicated data classes for UI state are beneficial.
+*   **Event-Driven Actions**: Use of sealed interfaces/classes for UI events.
+*   **Potential for Reusability**: Common dialogs and UI elements are good candidates for extraction.
+*   **DataStore for Preferences**: Likely used for simple key-value preferences.
+*   **Error Handling Granularity**: Good mix of general and field-specific errors.
+*   **Feature Modularity**: Well-organized code structure based on features.

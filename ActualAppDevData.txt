@@ -1,0 +1,76 @@
+# Work Tracker App Development Summary (ActualAppDevData.txt)
+
+## 1. App Overview
+The application is named "Work Tracker" (from `app_name` string and project name).
+It is an Android application built using Kotlin and Jetpack Compose for its user interface.
+The main screen (`MainActivity.kt`) displays three action cards:
+- "Log Work Activity"
+- "Personal Notes"
+- "Report work activities"
+
+The app uses a custom `Application` class (`MyApplication.kt`) annotated with `@HiltAndroidApp` for Hilt dependency injection setup.
+
+## 2. Core Technologies & Libraries
+- **Language:** Kotlin (version specified as `2.2.10` in `libs.versions.toml`).
+- **UI:** Jetpack Compose (using `androidx.compose.ui`, `androidx.compose.material3`, etc., with `composeBom` version `2024.09.00`).
+- **Dependency Injection:** Hilt (version `2.57.1`, using `hilt-android` and `hilt-compiler`).
+- **Annotation Processing:** Kotlin Symbol Processing (KSP) (plugin version `2.2.10-2.0.2`).
+- **Build System:** Gradle with Kotlin DSL (`build.gradle.kts` files).
+- **Version Management:** Gradle Version Catalog (`gradle/libs.versions.toml`).
+- **Android Gradle Plugin (AGP):** Version `8.13.0`.
+- **Key AndroidX Libraries:**
+    - `core-ktx`: `1.17.0`
+    - `lifecycle-runtime-ktx`: `2.9.3`
+    - `activity-compose`: `1.10.1`
+- **Other Notable Dependencies:**
+    - `com.google.ai.client.generativeai:generativeai`: `0.9.0` (Google Generative AI/Gemini API).
+
+## 3. Build Configuration
+- **Project Structure:** Standard Android app structure with an `app` module.
+- **Namespace:** `com.example.worktracker`.
+- **SDK Versions:**
+    - `minSdk`: 31
+    - `compileSdk`: 36
+    - `targetSdk`: 36
+- **Java Compatibility:** Configured for Java 11 (`sourceCompatibility` and `targetCompatibility`).
+- **Build Features:**
+    - Jetpack Compose enabled.
+    - `buildConfig` enabled (exposes `GOOGLE_API_KEY` from `local.properties`).
+- **Permissions:**
+    - `android.permission.INTERNET` (declared in `AndroidManifest.xml`).
+
+## 4. Development History & Key Changes (Based on Chat Interaction)
+
+- **Initial Setup & Troubleshooting:**
+    - Started with a project that required a Gradle sync, clean, and build.
+    - Encountered a "uses or overrides a deprecated API" warning related to Hilt-generated code (`Hilt_MyApplication.java`).
+
+- **Hilt Dependency Update:**
+    - The Hilt Android plugin version in the project-level `build.gradle.kts` was updated from `2.51.1` to `2.57.1`.
+    - The Hilt library dependencies (`hilt-android` and `hilt-android-compiler`) in the app-level `build.gradle.kts` were updated from `2.51.1` to `2.57.1`.
+
+- **Investigating Deprecation Warnings:**
+    - Attempted to use the `-Xlint:deprecation` Kotlin compiler flag to get more details on deprecations.
+    - Discovered warnings:
+        - `w: Kapt currently doesn\'t support language version 2.0+. Falling back to 1.9.`
+        - `w: Flag is not supported by this version of the compiler: -Xlint:deprecation`
+    - Concluded that Kapt\'s fallback to Kotlin 1.9 prevented the `-Xlint:deprecation` flag from working as intended.
+    - The `-Xlint:deprecation` flag was subsequently removed from `kotlinOptions` in `app/build.gradle.kts`.
+
+- **Migration from Kapt to KSP for Hilt:**
+    - To address Kapt limitations and modernize the build process, the project was migrated from Kapt to KSP for Hilt:
+        - Added KSP plugin (`com.google.devtools.ksp` version `2.2.10-2.0.2`) to the project-level `build.gradle.kts`.
+        - In `app/build.gradle.kts`:
+            - Removed the `kotlin-kapt` plugin.
+            - Added the `com.google.devtools.ksp` plugin.
+            - Changed the Hilt compiler dependency from `kapt("com.google.dagger:hilt-android-compiler:...")` to `ksp("com.google.dagger:hilt-compiler:...")`.
+    - The project was successfully synced and built after this migration.
+
+- **Kotlin Version Check:**
+    - Verified that the Kotlin version (`2.2.10`, as specified in `libs.versions.toml` and used by the KSP plugin) is the current stable version. No explicit upgrade was needed at this stage.
+
+- **Final State:**
+    - The project now uses Hilt with KSP for annotation processing.
+    - Dependencies, including Hilt, are on up-to-date stable versions.
+    - The project builds successfully.
+

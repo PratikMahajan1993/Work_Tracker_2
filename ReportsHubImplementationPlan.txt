@@ -1,0 +1,100 @@
+### **Detailed Implementation Plan: Reports Hub**
+
+#### **Guiding Principles & Suggestions**
+
+*   **Architecture**: Maintain the existing MVVM architecture.
+*   **AI Data Exposure**: The `GeminiProService` will not access the database directly. The `ReportsViewModel` will fetch data via the `WorkActivityRepository`, format it into a prompt, and then pass that prompt to the service. This maintains a clean separation of concerns.
+*   **PDF Generation**: Use Android's built-in `android.graphics.pdf.PdfDocument` for creating simple text-based PDFs.
+*   **Permissions**: Use the `MediaStore` API to save PDFs to the "Downloads" folder, which is the modern approach and minimizes the need for explicit storage permissions.
+
+---
+
+#### **Phase 1: Backend and Data Layer Foundation**
+
+*   **Step 1: Enhance Data Access Layer**
+    *   **Goal**: Create a method to fetch the most recent activity logs.
+    *   **Sub-steps**:
+        1.  **Modify `WorkActivityDao.kt`**: Add `fun getRecentLogs(): Flow<List<WorkActivityLog>>` with the query `@Query("SELECT * FROM work_activity_logs ORDER BY startTime DESC LIMIT 5")`.
+        2.  **Modify `WorkActivityRepository.kt`**: Add `fun getRecentLogs()` to the interface.
+        3.  **Modify `WorkActivityRepositoryImpl.kt`**: Implement `getRecentLogs()` to call the new DAO function.
+    *   **Verification**: Sync, Clean, and Build.
+
+*   **Step 2: Create the ViewModel for the Reports Hub**
+    *   **Goal**: Create a new ViewModel to manage state and logic.
+    *   **Sub-steps**:
+        1.  **Create `ReportsUiState.kt`**: Define `ReportsUiState` and `RecentLogDisplayInfo` data classes.
+        2.  **Create `ReportsViewModel.kt`**:
+            *   Annotate with `@HiltViewModel` and inject `WorkActivityRepository`.
+            *   Fetch recent logs and map them to `RecentLogDisplayInfo` objects within the `uiState`.
+            *   Create placeholder functions: `onShowPdfDialog(logId: Long)`, `onDismissPdfDialog()`, `onConfirmPdfExport()`.
+    *   **Verification**: Sync, Clean, and Build.
+
+---
+
+#### **Phase 2: UI Implementation (Screens and Composables)**
+
+*   **Step 3: Create the Main Reports Hub Screen**
+    *   **Goal**: Build the main screen with action cards and a side drawer.
+    *   **Sub-steps**:
+        1.  **Create `ReportsHubScreen.kt`**:
+            *   Use a `ModalNavigationDrawer` as the root composable.
+            *   The main content will be a `Scaffold` with a `TopAppBar` (including a drawer icon).
+            *   Inside the `Scaffold`, create a `Column` with four `ActionCard`s for the AI features with empty `onClick` lambdas.
+    *   **Verification**: Sync, Clean, and Build.
+
+*   **Step 4: Create the Drawer Content Composable**
+    *   **Goal**: Display the list of recent activities in the drawer.
+    *   **Sub-steps**:
+        1.  **Create `ReportsDrawerContent.kt`**:
+            *   This composable will take the list of `RecentLogDisplayInfo` and event handlers from the ViewModel.
+            *   Use a `LazyColumn` to display the logs.
+            *   Use the `foundation.combinedClickable` modifier to handle `onLongClick` and call `viewModel.onShowPdfDialog(log.id)`.
+    *   **Verification**: Sync, Clean, and Build.
+
+*   **Step 5: Create the Export Confirmation Dialog**
+    *   **Goal**: Create the dialog for PDF export confirmation.
+    *   **Sub-steps**:
+        1.  **Create `ExportConfirmationDialog.kt`**:
+            *   Create an `AlertDialog` composable.
+            *   It will have a "Cancel" button (`onDismissPdfDialog`) and a "Confirm Export" button (`onConfirmPdfExport`).
+        2.  **Integrate Dialog**: In `ReportsHubScreen.kt`, show this dialog based on a flag in `ReportsUiState`.
+    *   **Verification**: Sync, Clean, and Build.
+
+---
+
+#### **Phase 3: PDF Generation and File System Logic**
+
+*   **Step 6: Implement PDF Generation Logic**
+    *   **Goal**: Create the code to convert a log into a PDF.
+    *   **Sub-steps**:
+        1.  **Create `PdfGenerator.kt`**:
+            *   Create a helper object/class.
+            *   Create a function `generatePdfFromLog(context: Context, log: WorkActivityLog): Boolean`.
+            *   Inside, format the log into a plain text string.
+            *   Use `android.graphics.pdf.PdfDocument` to create and draw the text.
+            *   Save the file to the "Downloads" directory using the `MediaStore` API.
+            *   Return `true` on success, `false` on failure.
+    *   **Verification**: Sync, Clean, and Build.
+
+*   **Step 7: Update ViewModel with PDF Logic**
+    *   **Goal**: Connect the `PdfGenerator` to the ViewModel.
+    *   **Sub-steps**:
+        1.  **Modify `ReportsViewModel.kt`**:
+            *   Inject `Application` context.
+            *   In `onConfirmPdfExport()`, launch a coroutine to call `PdfGenerator.generatePdfFromLog()`.
+            *   Use a `SharedFlow` to send a one-time event to the UI to show a `Toast` or `Snackbar` for success or failure.
+            *   Call `onDismissPdfDialog()` to close the dialog.
+    *   **Verification**: Sync, Clean, and Build.
+
+---
+
+#### **Phase 4: Final Integration**
+
+*   **Step 8: Integrate Reports Hub into Navigation**
+    *   **Goal**: Connect the new feature to the `MainScreen`.
+    *   **Sub-steps**:
+        1.  **Modify `MainActivity.kt`**:
+            *   Add `const val REPORTS_HUB = "reportsHub"` to `AppRoutes`.
+            *   Add a new `composable(AppRoutes.REPORTS_HUB) { ReportsHubScreen() }` to the `AppNavigationHost`.
+            *   Find the "Report work activities" `ActionCard` on `MainScreen` and update its `onClick` to `navController.navigate(AppRoutes.REPORTS_HUB)`.
+    *   **Verification**: Sync, Clean, and Build.

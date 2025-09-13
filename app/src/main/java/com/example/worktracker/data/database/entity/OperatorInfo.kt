@@ -1,0 +1,16 @@
+package com.example.worktracker.data.database.entity
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "operator_info")
+data class OperatorInfo(
+    @PrimaryKey
+    val operatorId: Int, // User-defined ID, not auto-generated
+    val name: String,
+    val hourlySalary: Double,
+    val role: String,
+    val priority: Int, // e.g., 1-5 scale
+    val notes: String?,
+    val notesForAi: String?
+)

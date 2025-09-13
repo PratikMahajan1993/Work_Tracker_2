@@ -1,0 +1,2 @@
+1) The app architecture will be simple.
+2) It should be such that dependencies are resolved as simply as possible.
