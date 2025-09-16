@@ -1,10 +1,12 @@
 package com.example.worktracker.ui.screens.preferences
 
+import android.widget.Toast // Added for Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext // Added for Toast
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -21,6 +23,11 @@ import com.example.worktracker.ui.components.AddTheBoyDialog
 import com.example.worktracker.ui.components.EditTheBoyDialog
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+// Removed: import androidx.compose.material.icons.filled.Login
+// Removed: import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.Login // Added AutoMirrored
+import androidx.compose.material.icons.automirrored.filled.Logout // Added AutoMirrored
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +39,16 @@ fun PreferencesScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showDeleteOperatorConfirmDialog by remember { mutableStateOf<OperatorInfo?>(null) }
     var showDeleteTheBoyConfirmDialog by remember { mutableStateOf<TheBoysInfo?>(null) }
+    var showSignOutConfirmDialog by remember { mutableStateOf(false) } // State for sign-out dialog
+
+    val context = LocalContext.current // For Toast
+
+    LaunchedEffect(key1 = uiState.snackbarMessage) {
+        uiState.snackbarMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearSnackbarMessage() // Important to prevent re-showing on recomposition
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -47,18 +64,60 @@ fun PreferencesScreen(
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // Account Section Removed
-        // HorizontalDivider Removed
+        // Account Management Section
+        Text(
+            text = "Account Management",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+        )
 
+        if (uiState.currentUser == null) {
+            Button(
+                onClick = { viewModel.onSignInClicked() },
+                enabled = !uiState.isAccountActionInProgress,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Login, contentDescription = "Sign In Icon", modifier = Modifier.size(ButtonDefaults.IconSize)) // Updated Icon
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text("Sign In with Google")
+            }
+        } else {
+            Text(
+                text = "Signed in as: ${uiState.currentUser?.username ?: "User"}",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Button(
+                onClick = { showSignOutConfirmDialog = true },
+                enabled = !uiState.isAccountActionInProgress,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Sign Out Icon", modifier = Modifier.size(ButtonDefaults.IconSize)) // Updated Icon
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text("Sign Out")
+            }
+        }
+        if (uiState.isAccountActionInProgress) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 8.dp))
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+        // Other Preference Items from original file
+        Text(
+            text = "App Security & Data",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+        )
         Button(
             onClick = { viewModel.onShowSetPasswordDialog() },
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
         ) {
             Text(if (uiState.isPasswordSet) "Change Master Reset Password" else "Set Master Reset Password")
         }
         Button(
             onClick = { viewModel.onShowSmsContactDialog() },
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
         ) {
             Text(if (uiState.preferredSmsContact != null) "Change Preferred SMS Contact" else "Set Preferred SMS Contact")
         }
@@ -71,7 +130,7 @@ fun PreferencesScreen(
         }
         Button(
             onClick = { viewModel.onShowSetGeminiApiKeyDialog() },
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
         ) {
             Text(if (uiState.isGeminiApiKeySet) "Change Gemini API Key" else "Set Gemini API Key")
         }
@@ -85,12 +144,12 @@ fun PreferencesScreen(
 
         Text(
             text = "Activity Categories",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 8.dp)
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
         )
         Button(
             onClick = { viewModel.onManageCategoriesClicked() },
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
         ) {
             Text("Manage Activity Categories")
         }
@@ -100,18 +159,18 @@ fun PreferencesScreen(
         // Manufacturing Components Section
         Text(
             text = "Manufacturing Components",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 8.dp)
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
         )
         Button(
             onClick = { navController.navigate(AppRoutes.MANAGE_COMPONENTS) }, 
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
         ) {
             Text("Add/Edit Manufacturing Components")
         }
         Button(
             onClick = { navController.navigate(AppRoutes.VIEW_COMPONENTS) },
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
         ) {
             Text("List of Components")
         }
@@ -120,12 +179,12 @@ fun PreferencesScreen(
 
         Text(
             text = "Operator Management",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 8.dp)
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
         )
         Button(
             onClick = { viewModel.onOperatorSectionClicked() },
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
         ) {
             Text(if (uiState.isOperatorSectionUnlocked) "Access Operator Information" else "Unlock Operator Information")
         }
@@ -134,12 +193,12 @@ fun PreferencesScreen(
 
         Text(
             text = "'The Boys' Management",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 8.dp)
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
         )
         Button(
             onClick = { viewModel.onTheBoysSectionClicked() },
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
         ) {
             Text(if (uiState.isOperatorSectionUnlocked) "Access 'The Boys' Information" else "Unlock 'The Boys' Information")
         }
@@ -169,7 +228,31 @@ fun PreferencesScreen(
         }
     }
 
-    // Dialogs
+    // Sign Out Confirmation Dialog
+    if (showSignOutConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showSignOutConfirmDialog = false },
+            title = { Text("Confirm Sign Out") },
+            text = { Text("Are you sure you want to sign out?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.onSignOutClicked()
+                        showSignOutConfirmDialog = false
+                    }
+                ) {
+                    Text("Sign Out")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignOutConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Existing Dialogs
     SetPasswordDialog(
         showDialog = uiState.showSetPasswordDialog,
         newPasswordInput = uiState.newPasswordInput,
@@ -225,7 +308,7 @@ fun PreferencesScreen(
         passwordError = uiState.operatorPasswordError,
         onPasswordChange = viewModel::onOperatorPasswordAttemptChange,
         onConfirm = viewModel::onUnlockSectionAttempt,
-        onDismiss = { viewModel.onDismissOperatorPasswordDialog() }
+        onDismiss = { viewModel.onDismissOperatorPasswordDialog() } // Assuming same dismissal logic as operator pwd dialog
     )
 
     OperatorListDialog(

@@ -1,9 +1,14 @@
 package com.example.worktracker.ui.screens.preferences
 
+import android.content.Context // Added for ApplicationContext
 import android.content.SharedPreferences
+import android.util.Log
+import androidx.credentials.CredentialManager // Added for CredentialManager
+import androidx.credentials.exceptions.GetCredentialException // Added for GetCredentialException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.worktracker.BuildConfig
+import com.example.worktracker.data.database.AppDatabase // Added import for AppDatabase
 import com.example.worktracker.data.database.entity.ActivityCategory
 import com.example.worktracker.data.database.entity.OperatorInfo
 import com.example.worktracker.data.database.entity.TheBoysInfo
@@ -14,14 +19,22 @@ import com.example.worktracker.data.repository.WorkActivityRepository
 import com.example.worktracker.di.AppModule.KEY_GEMINI_API_KEY
 import com.example.worktracker.di.AppModule.KEY_MASTER_PASSWORD
 import com.example.worktracker.di.AppModule.KEY_SMS_CONTACT
+import com.example.worktracker.ui.signin.GoogleAuthUiClient // Added for GoogleAuthUiClient
+import com.example.worktracker.ui.signin.SignInErrorType // Added for SignInErrorType
+import com.example.worktracker.ui.signin.UserData // Added for UserData
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext // Added for ApplicationContext
+import kotlinx.coroutines.Dispatchers // Added for Dispatchers.IO
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext // Added for withContext
 import javax.inject.Inject
+
+private const val TAG = "PreferencesViewModel"
 
 // Field constants for OperatorInfo
 const val FIELD_OPERATOR_ID = "operatorId"
@@ -47,7 +60,7 @@ data class PreferencesUiState(
     val newPasswordError: String? = null,
     val confirmPasswordError: String? = null,
     val isPasswordSet: Boolean = false,
-    val snackbarMessage: String? = null,
+    var snackbarMessage: String? = null, // Made var to allow easy updates
     val showMasterResetConfirmationDialog: Boolean = false,
     val masterResetPasswordAttempt: String = "",
     val masterResetPasswordError: String? = null,
@@ -120,26 +133,27 @@ data class PreferencesUiState(
     val editBoyNotesForAiInput: String = "",
     val editBoyIdError: String? = null,
     val editBoyNameError: String? = null,
-    val editBoyRoleError: String? = null
-    // Removed isUserSignedIn
-)
+    val editBoyRoleError: String? = null,
 
-// Removed PreferencesEvent sealed class
+    // Account Management States
+    val currentUser: UserData? = null,
+    val isAccountActionInProgress: Boolean = false
+)
 
 @HiltViewModel
 class PreferencesViewModel @Inject constructor(
+    @param:ApplicationContext private val applicationContext: Context, 
     private val sharedPreferences: SharedPreferences,
-    private val workActivityRepository: WorkActivityRepository,
+    private val appDatabase: AppDatabase, 
+    private val workActivityRepository: WorkActivityRepository, 
     private val operatorRepository: OperatorRepository,
     private val activityCategoryRepository: ActivityCategoryRepository,
-    private val theBoysRepository: TheBoysRepository
-    // Removed googleAuthUiClient
+    private val theBoysRepository: TheBoysRepository,
+    private val googleAuthUiClient: GoogleAuthUiClient
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PreferencesUiState())
     val uiState: StateFlow<PreferencesUiState> = _uiState.asStateFlow()
-
-    // Removed _eventFlow and eventFlow
 
     private val addOperatorFieldOrder = listOf(
         FIELD_OPERATOR_ID,
@@ -166,11 +180,67 @@ class PreferencesViewModel @Inject constructor(
         loadOperators()
         loadActivityCategories()
         loadTheBoys()
-        // Removed checkUserSignInStatus()
+        loadCurrentUser()
     }
 
-    // Removed checkUserSignInStatus, onSignInClicked, onSignOutClicked methods
-    
+    private fun loadCurrentUser() {
+        _uiState.value = _uiState.value.copy(currentUser = googleAuthUiClient.getSignedInUser())
+    }
+
+    fun onSignInClicked() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isAccountActionInProgress = true, snackbarMessage = null)
+            try {
+                val signInRequest = googleAuthUiClient.createSignInRequest()
+                val credentialManager = CredentialManager.create(applicationContext)
+                val result = credentialManager.getCredential(applicationContext, signInRequest)
+                val signInResult = googleAuthUiClient.signInWithCredential(result.credential)
+
+                if (signInResult.data != null) {
+                    _uiState.value = _uiState.value.copy(
+                        currentUser = signInResult.data,
+                        snackbarMessage = "Signed in successfully as ${signInResult.data.username ?: "User"}."
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        snackbarMessage = signInResult.errorMessage ?: "Sign-in failed. Please try again."
+                    )
+                }
+            } catch (e: GetCredentialException) {
+                _uiState.value = _uiState.value.copy(
+                    snackbarMessage = e.localizedMessage ?: "Sign-in failed. Type: ${e.type}. Please try again."
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    snackbarMessage = e.localizedMessage ?: "An unexpected error occurred. Please try again."
+                )
+            }
+            finally {
+                _uiState.value = _uiState.value.copy(isAccountActionInProgress = false)
+            }
+        }
+    }
+
+    fun onSignOutClicked() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isAccountActionInProgress = true, snackbarMessage = null)
+            try {
+                googleAuthUiClient.signOut()
+                _uiState.value = _uiState.value.copy(
+                    currentUser = null,
+                    snackbarMessage = "Signed out successfully."
+                )
+            } catch (e: Exception) {
+                 _uiState.value = _uiState.value.copy(
+                    snackbarMessage = e.localizedMessage ?: "Sign-out failed. Please try again."
+                )
+            }
+            finally {
+                _uiState.value = _uiState.value.copy(isAccountActionInProgress = false)
+            }
+        }
+    }
+
     private fun loadOperators() {
         operatorRepository.getAllOperators()
             .onEach { operatorList ->
@@ -315,18 +385,49 @@ class PreferencesViewModel @Inject constructor(
 
         if (storedPassword != null && attempt == storedPassword) {
             viewModelScope.launch {
-                workActivityRepository.clearAllLogs()
-                operatorRepository.getAllOperators().collect { list -> list.forEach { operatorRepository.deleteOperator(it) } }
-                theBoysRepository.getAllTheBoys().collect { list -> list.forEach { theBoysRepository.deleteTheBoy(it) } }
-                activityCategoryRepository.getAllCategories().collect { list -> list.forEach { activityCategoryRepository.deleteCategory(it) } }
+                try {
+                    withContext(Dispatchers.IO) {
+                        appDatabase.clearAllTables() // Wipe Room DB
+                        sharedPreferences.edit().clear().apply() // Wipe SharedPreferences
+                        googleAuthUiClient.signOut() // Explicitly sign out
+                    }
 
-                _uiState.value = _uiState.value.copy(
-                    showMasterResetConfirmationDialog = false,
-                    masterResetPasswordAttempt = "",
-                    masterResetPasswordError = null,
-                    snackbarMessage = "All application data has been wiped.",
-                    isOperatorSectionUnlocked = false,
-                )
+                    // Reset relevant UI states immediately after background tasks complete
+                    _uiState.value = _uiState.value.copy(
+                        masterResetPasswordError = null, // Clear previous error if any
+                        snackbarMessage = "All application data and settings have been wiped.",
+                        isOperatorSectionUnlocked = false,
+                        isPasswordSet = false,
+                        preferredSmsContact = null,
+                        isGeminiApiKeySet = false,
+                        operators = emptyList(),
+                        activityCategories = emptyList(),
+                        theBoysList = emptyList(),
+                        currentUser = null 
+                    )
+
+                    // Re-initialize necessary states from (now empty) data sources
+                    checkIfPasswordIsSet()
+                    loadSmsContact()
+                    checkIfGeminiApiKeyIsSet()
+                    loadOperators() 
+                    loadActivityCategories()
+                    loadTheBoys()
+                    loadCurrentUser() 
+
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error during master reset: ", e)
+                    _uiState.value = _uiState.value.copy(
+                        masterResetPasswordError = null, // Clear password attempt error
+                        snackbarMessage = "Error during master reset: ${e.localizedMessage}"
+                    )
+                } finally {
+                    // Ensure dialog is dismissed regardless of outcome
+                    _uiState.value = _uiState.value.copy(
+                        showMasterResetConfirmationDialog = false,
+                        masterResetPasswordAttempt = "" // Clear password attempt
+                    )
+                }
             }
         } else {
             _uiState.value = _uiState.value.copy(masterResetPasswordError = "Incorrect password.")

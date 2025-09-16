@@ -107,14 +107,14 @@ fun AppNavigationHost(
             val currentContext = LocalContext.current
 
             LaunchedEffect(key1 = Unit) {
+                // This ensures that if the user is already signed in (e.g. app was minimized and reopened)
+                // they are navigated directly to the main screen.
                 if (googleAuthUiClient.getSignedInUser() != null) {
                     navController.navigate(AppRoutes.MAIN_SCREEN) {
                         popUpTo(AppRoutes.SIGN_IN_SCREEN) { inclusive = true }
                     }
                 }
             }
-
-            // ActivityResultLauncher is removed as we are simplifying to direct CredentialManager flow
 
             LaunchedEffect(key1 = viewModel, key2 = navController) {
                 viewModel.signInUiEvent.collect {
@@ -152,23 +152,24 @@ fun AppNavigationHost(
                             val signInRequest = googleAuthUiClient.createSignInRequest()
                             val credentialManager = CredentialManager.create(activity)
                             val result = credentialManager.getCredential(activity, signInRequest)
-                            // Directly process the credential from the result
                             val signInResult = googleAuthUiClient.signInWithCredential(result.credential)
-                            viewModel.onSignInResult(signInResult)
+                            viewModel.onSignInResult(signInResult) // ViewModel handles navigation via UiEvent
                         } catch (e: GetCredentialException) {
-                            // Handle all GetCredentialExceptions, including GetCredentialInterruptedException,
-                            // by showing an error. The user will have to tap the sign-in button again.
                             viewModel.onSignInActivityError(
                                 e.localizedMessage ?: "Sign-in failed. Type: ${e.type}. Please try again.",
                                 SignInErrorType.CredentialManagerError(type = e.type)
                             )
                         } catch (e: Exception) {
-                             // Catch any other unexpected exceptions
                              viewModel.onSignInActivityError(
                                 e.localizedMessage ?: "An unexpected error occurred. Please try again.",
                                 SignInErrorType.UnknownError
                             )
                         }
+                    }
+                },
+                onContinueAsGuestClick = { // Added handler for guest navigation
+                    navController.navigate(AppRoutes.MAIN_SCREEN) {
+                        popUpTo(AppRoutes.SIGN_IN_SCREEN) { inclusive = true }
                     }
                 }
             )

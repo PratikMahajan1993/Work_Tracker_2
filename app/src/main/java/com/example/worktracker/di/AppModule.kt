@@ -24,6 +24,7 @@ import com.example.worktracker.data.repository.ProductionActivityRepository
 import com.example.worktracker.data.repository.ProductionActivityRepositoryImpl
 import com.example.worktracker.data.repository.ComponentInfoRepository
 import com.example.worktracker.data.repository.ComponentInfoRepositoryImpl
+import com.example.worktracker.ui.signin.GoogleAuthUiClient // Added import
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -39,6 +40,12 @@ object AppModule {
     const val KEY_MASTER_PASSWORD = "master_reset_password"
     const val KEY_SMS_CONTACT = "sms_contact"
     const val KEY_GEMINI_API_KEY = "gemini_api_key"
+
+    @Provides
+    @Singleton
+    fun provideGoogleAuthUiClient(@ApplicationContext context: Context): GoogleAuthUiClient {
+        return GoogleAuthUiClient(context = context)
+    }
 
     @Provides
     @Singleton

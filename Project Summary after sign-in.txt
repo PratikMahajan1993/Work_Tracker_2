@@ -1,0 +1,58 @@
+Project Name: Work Tracker
+Root Folder: C:/Users/asus/AndroidStudioProjects/WorkTracker2
+
+**1. Project Overview & Core Purpose:**
+The "Work Tracker" application is an Android project developed in Kotlin using Jetpack Compose for its UI. Its primary purpose is to help users track various aspects of their work, including general work activities, manufacturing production, and management of associated entities like operators and "The Boys" (presumably a team or group of individuals). It also includes a comprehensive preferences section for app configuration and data management.
+
+**2. Key Functional Areas (Modules/Features):**
+*   **Work Tracking:** Allows users to log work activities, categorize them, and manage their history.
+*   **Production Tracking:** Functionality related to tracking manufacturing components.
+*   **Operator Management:** Managing information about operators involved in work.
+*   **"The Boys" Management:** Management of another group of individuals ("The Boys").
+*   **Preferences Screen:** A central hub for various app settings including:
+    *   Master Reset (with password protection to wipe all app data).
+    *   SMS Contact configuration.
+    *   Gemini API Key configuration for AI-related features.
+    *   Management of activity categories.
+    *   Access to Operator and "The Boys" information (behind a password-protected section).
+*   **Authentication (Google Sign-In):** Secure user authentication using Google accounts.
+
+**3. Technical Stack & Architecture:**
+*   **Language:** Kotlin
+*   **UI Framework:** Jetpack Compose
+*   **Dependency Injection:** Hilt (Dagger Hilt)
+*   **Local Persistence:** Room Database for structured data storage.
+*   **Backend Integration:** Firebase (Auth for authentication, Firestore for cloud database, Firebase BOM for dependency management).
+*   **Authentication API:** AndroidX Credential Manager (`androidx.credentials`) for a modern, unified sign-in experience, particularly with Google Sign-In.
+*   **Build System:** Gradle (using version catalogs `libs.versions.toml`).
+
+**4. Recent Major Changes (Based on our interaction):**
+
+The primary focus of recent development has been a significant refactoring and enhancement of the Google Sign-In functionality and the introduction of guest access and account management features:
+
+*   **Google Sign-In Refactoring (Transition to pure Credential Manager flow):**
+    *   **Dependency Cleanup:** Removed the conflicting and older `com.google.android.gms:play-services-auth` dependency from `libs.versions.toml` and `app/build.gradle.kts` to resolve build conflicts and ensure a modern approach.
+    *   **Simplified Sign-In Logic (`GoogleAuthUiClient.kt`):** The sign-in mechanism was streamlined to exclusively use `androidx.credentials.CredentialManager`. This involved:
+        *   Removing the `signInFromServerIntent` method and any direct usage of `GoogleIdTokenCredential.createFromIntent`, as these are typically used in older "One Tap" flows or manual `PendingIntent` handling.
+        *   Adjusting the `processSignIn` method to correctly handle `androidx.credentials.CustomCredential` objects (which is how Google ID tokens are often returned by Credential Manager) by using `GoogleIdTokenCredential.createFrom(customCredential.data)`.
+        *   Removed redundant `idToken == null` checks.
+    *   **Simplified UI Integration (`MainActivity.kt`):** The `SignInScreen`'s integration in `MainActivity.kt` was simplified by removing the `ActivityResultLauncher` and its associated `PendingIntent` logic. The `onSignInClick` now directly processes the result from `credentialManager.getCredential()`, showing immediate success or error feedback.
+*   **New Feature: "Continue as Guest" Option:**
+    *   A "Continue as Guest" `TextButton` was added to the `SignInScreen.kt`.
+    *   When clicked, it directly navigates the user to the `AppRoutes.MAIN_SCREEN`, allowing access to the app without requiring Google authentication. No special "guest state" is explicitly managed; the app simply proceeds with `googleAuthUiClient.getSignedInUser()` returning `null`.
+*   **New Feature: Account Management Section in Preferences:**
+    *   A new "Account Management" section was added to `PreferencesScreen.kt`.
+    *   **Sign-In Button:** A "Sign In with Google" button is displayed. It's enabled when no user is signed in and disabled (`!uiState.isAccountActionInProgress`) when an account action is in progress or a user is already signed in. Clicking it initiates the `CredentialManager` sign-in flow via `PreferencesViewModel`.
+    *   **Sign-Out Button:** A "Sign Out" button is displayed when a user is signed in. Clicking it triggers a confirmation `AlertDialog`. Upon confirmation, `googleAuthUiClient.signOut()` is called, and the UI updates accordingly. It's disabled when an account action is in progress.
+    *   **User Display:** The username of the currently signed-in user is displayed in this section.
+    *   **State Management (`PreferencesViewModel.kt`):**
+        *   `GoogleAuthUiClient` was injected into `PreferencesViewModel`.
+        *   The ViewModel now exposes `currentUser: UserData?` and `isAccountActionInProgress: Boolean` states.
+        *   Methods `onSignInClicked()` and `onSignOutClicked()` were implemented to interact with `GoogleAuthUiClient` and update the UI state.
+        *   Snackbar (now Toast) messages are used to provide feedback on sign-in/sign-out operations.
+*   **Build & Compiler Warning Resolutions:**
+    *   Resolved Dagger/Hilt `MissingBinding` error for `GoogleAuthUiClient` by adding a `@Provides` method in `AppModule.kt`.
+    *   Corrected deprecated icon usages (`Icons.Filled.Login`, `Icons.Filled.Logout`) to their `Icons.AutoMirrored.Filled` equivalents in `PreferencesScreen.kt`.
+    *   Addressed a Kotlin compiler warning by explicitly using `@param:ApplicationContext` for the injected context in `PreferencesViewModel.kt`.
+
+This summary captures the current state and recent evolutions of the Work Tracker project, particularly focusing on the authentication and new navigation paths.
