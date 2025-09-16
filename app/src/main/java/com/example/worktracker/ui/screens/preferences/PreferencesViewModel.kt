@@ -6,10 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.worktracker.BuildConfig
 import com.example.worktracker.data.database.entity.ActivityCategory
 import com.example.worktracker.data.database.entity.OperatorInfo
-import com.example.worktracker.data.database.entity.TheBoysInfo // New import
+import com.example.worktracker.data.database.entity.TheBoysInfo
 import com.example.worktracker.data.repository.ActivityCategoryRepository
 import com.example.worktracker.data.repository.OperatorRepository
-import com.example.worktracker.data.repository.TheBoysRepository // New import
+import com.example.worktracker.data.repository.TheBoysRepository
 import com.example.worktracker.data.repository.WorkActivityRepository
 import com.example.worktracker.di.AppModule.KEY_GEMINI_API_KEY
 import com.example.worktracker.di.AppModule.KEY_MASTER_PASSWORD
@@ -121,7 +121,10 @@ data class PreferencesUiState(
     val editBoyIdError: String? = null,
     val editBoyNameError: String? = null,
     val editBoyRoleError: String? = null
+    // Removed isUserSignedIn
 )
+
+// Removed PreferencesEvent sealed class
 
 @HiltViewModel
 class PreferencesViewModel @Inject constructor(
@@ -129,11 +132,14 @@ class PreferencesViewModel @Inject constructor(
     private val workActivityRepository: WorkActivityRepository,
     private val operatorRepository: OperatorRepository,
     private val activityCategoryRepository: ActivityCategoryRepository,
-    private val theBoysRepository: TheBoysRepository // New repository injected
+    private val theBoysRepository: TheBoysRepository
+    // Removed googleAuthUiClient
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PreferencesUiState())
     val uiState: StateFlow<PreferencesUiState> = _uiState.asStateFlow()
+
+    // Removed _eventFlow and eventFlow
 
     private val addOperatorFieldOrder = listOf(
         FIELD_OPERATOR_ID,
@@ -145,7 +151,6 @@ class PreferencesViewModel @Inject constructor(
         FIELD_OPERATOR_NOTES_AI
     )
 
-    // New field order for AddTheBoyDialog
     private val addTheBoyFieldOrder = listOf(
         FIELD_BOY_ID,
         FIELD_BOY_NAME,
@@ -160,9 +165,12 @@ class PreferencesViewModel @Inject constructor(
         checkIfGeminiApiKeyIsSet()
         loadOperators()
         loadActivityCategories()
-        loadTheBoys() // New: Load 'The Boys' on init
+        loadTheBoys()
+        // Removed checkUserSignInStatus()
     }
 
+    // Removed checkUserSignInStatus, onSignInClicked, onSignOutClicked methods
+    
     private fun loadOperators() {
         operatorRepository.getAllOperators()
             .onEach { operatorList ->
@@ -179,7 +187,6 @@ class PreferencesViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    // New function to load 'The Boys'
     private fun loadTheBoys() {
         theBoysRepository.getAllTheBoys()
             .onEach { boysList ->
@@ -207,7 +214,6 @@ class PreferencesViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(snackbarMessage = null)
     }
 
-    // --- Master Password & Reset (Existing - No changes needed here) ---
     fun onShowSetPasswordDialog() {
         _uiState.value = _uiState.value.copy(
             showSetPasswordDialog = true,
@@ -309,17 +315,17 @@ class PreferencesViewModel @Inject constructor(
 
         if (storedPassword != null && attempt == storedPassword) {
             viewModelScope.launch {
-                workActivityRepository.clearAllLogs() // Consider if other data needs wiping
-                operatorRepository.getAllOperators().collect { list -> list.forEach { operatorRepository.deleteOperator(it) } } // Example for operators
-                theBoysRepository.getAllTheBoys().collect { list -> list.forEach { theBoysRepository.deleteTheBoy(it) } } // Example for TheBoys
-                activityCategoryRepository.getAllCategories().collect { list -> list.forEach { activityCategoryRepository.deleteCategory(it) } } // Example for categories
+                workActivityRepository.clearAllLogs()
+                operatorRepository.getAllOperators().collect { list -> list.forEach { operatorRepository.deleteOperator(it) } }
+                theBoysRepository.getAllTheBoys().collect { list -> list.forEach { theBoysRepository.deleteTheBoy(it) } }
+                activityCategoryRepository.getAllCategories().collect { list -> list.forEach { activityCategoryRepository.deleteCategory(it) } }
 
                 _uiState.value = _uiState.value.copy(
                     showMasterResetConfirmationDialog = false,
                     masterResetPasswordAttempt = "",
                     masterResetPasswordError = null,
                     snackbarMessage = "All application data has been wiped.",
-                    isOperatorSectionUnlocked = false, // Relock sections
+                    isOperatorSectionUnlocked = false,
                 )
             }
         } else {
@@ -327,7 +333,6 @@ class PreferencesViewModel @Inject constructor(
         }
     }
 
-    // --- SMS Contact (Existing - No changes needed here) ---
     fun onShowSmsContactDialog() {
         val currentContact = _uiState.value.preferredSmsContact ?: ""
         _uiState.value = _uiState.value.copy(
@@ -365,7 +370,6 @@ class PreferencesViewModel @Inject constructor(
         }
     }
 
-    // --- Gemini API Key (Existing - No changes needed here) ---
     fun onShowSetGeminiApiKeyDialog() {
         val currentApiKey = sharedPreferences.getString(KEY_GEMINI_API_KEY, "") ?: ""
         _uiState.value = _uiState.value.copy(
@@ -403,12 +407,11 @@ class PreferencesViewModel @Inject constructor(
         }
     }
 
-    // --- Operator Info Password Protection & List Dialog (Existing) ---
     fun onOperatorSectionClicked() {
         if (!_uiState.value.isOperatorSectionUnlocked) {
             _uiState.value = _uiState.value.copy(
-                showOperatorPasswordDialog = true, // Show operator-specific password dialog
-                showTheBoysPasswordDialog = false, // Ensure TheBoys dialog is hidden
+                showOperatorPasswordDialog = true,
+                showTheBoysPasswordDialog = false,
                 operatorPasswordAttempt = "",
                 operatorPasswordError = null
             )
@@ -433,17 +436,16 @@ class PreferencesViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(operatorPasswordAttempt = password, operatorPasswordError = null)
     }
     
-    // Generic unlock attempt, determines which list to show based on which password dialog was active
     fun onUnlockSectionAttempt() {
         val attempt = _uiState.value.operatorPasswordAttempt
-        if (attempt == BuildConfig.OPERATOR_INFO_PASSWORD) { // Using same password for now
+        if (attempt == BuildConfig.OPERATOR_INFO_PASSWORD) {
             val wasOperatorDialog = _uiState.value.showOperatorPasswordDialog
             _uiState.value = _uiState.value.copy(
                 isOperatorSectionUnlocked = true,
                 showOperatorPasswordDialog = false,
                 showTheBoysPasswordDialog = false,
-                showOperatorListDialog = wasOperatorDialog, // Show if operator dialog was the trigger
-                showTheBoysListDialog = !wasOperatorDialog, // Show if TheBoys dialog was the trigger (or if neither specifically, implies TheBoys if operator not shown)
+                showOperatorListDialog = wasOperatorDialog,
+                showTheBoysListDialog = !wasOperatorDialog,
                 operatorPasswordAttempt = "",
                 operatorPasswordError = null,
                 snackbarMessage = "Section unlocked."
@@ -453,7 +455,6 @@ class PreferencesViewModel @Inject constructor(
         }
     }
 
-    // --- Edit Operator Dialog Functions (Existing - No changes needed here) ---
     fun onEditOperatorClicked(operatorInfo: OperatorInfo) {
         _uiState.value = _uiState.value.copy(
             showEditOperatorDialog = true,
@@ -543,7 +544,6 @@ class PreferencesViewModel @Inject constructor(
         }
     }
 
-    // --- Add New Operator (Multi-Step Flow) Functions (Existing - No changes needed here) ---
     fun onAddNewOperatorClicked() {
         _uiState.value = _uiState.value.copy(
             showAddOperatorDialog = true,
@@ -675,7 +675,6 @@ class PreferencesViewModel @Inject constructor(
         }
     }
 
-    // --- Delete Operator (Existing - No changes needed here) ---
     fun onDeleteOperator(operatorInfo: OperatorInfo) {
         viewModelScope.launch {
             operatorRepository.deleteOperator(operatorInfo)
@@ -683,23 +682,18 @@ class PreferencesViewModel @Inject constructor(
         }
     }
 
-    // --- 'The Boys' Management Functions (New) ---
     fun onTheBoysSectionClicked() {
-        if (!_uiState.value.isOperatorSectionUnlocked) { // Using same unlock flag for simplicity
+        if (!_uiState.value.isOperatorSectionUnlocked) {
             _uiState.value = _uiState.value.copy(
-                showTheBoysPasswordDialog = true, // Show TheBoys-specific password dialog (or reuse operator dialog)
-                showOperatorPasswordDialog = false, // Ensure Operator dialog is hidden
-                operatorPasswordAttempt = "", // Reset attempt field
+                showTheBoysPasswordDialog = true,
+                showOperatorPasswordDialog = false,
+                operatorPasswordAttempt = "",
                 operatorPasswordError = null
             )
         } else {
             _uiState.value = _uiState.value.copy(showTheBoysListDialog = true)
         }
     }
-
-    // Assuming the same password dialog (`OperatorPasswordDialog`) is used.
-    // If a different one, then onDismissTheBoysPasswordDialog would be needed.
-    // For now, `onUnlockSectionAttempt` will handle unlocking and showing the correct list.
 
     fun onDismissTheBoysListDialog() {
         _uiState.value = _uiState.value.copy(showTheBoysListDialog = false)
@@ -765,8 +759,10 @@ class PreferencesViewModel @Inject constructor(
             val currentStep = _uiState.value.addTheBoyStep
             if (currentStep < addTheBoyFieldOrder.size - 1) {
                 _uiState.value = _uiState.value.copy(addTheBoyStep = currentStep + 1)
+            } else {
+                onSaveNewTheBoy() // Auto-save on last step if valid
             }
-        } // Save is handled by the Save button in the dialog directly
+        }
     }
 
     fun onAddTheBoyPreviousStep() {
@@ -777,7 +773,6 @@ class PreferencesViewModel @Inject constructor(
     }
 
     fun onSaveNewTheBoy() {
-        // Final validation for all fields before saving
         var allFieldsValid = true
         val tempErrors = mutableMapOf<String, String?>()
         val inputs = _uiState.value.newTheBoyInputs
@@ -829,7 +824,7 @@ class PreferencesViewModel @Inject constructor(
             editBoyRoleInput = theBoy.role,
             editBoyNotesInput = theBoy.notes ?: "",
             editBoyNotesForAiInput = theBoy.notesForAi ?: "",
-            editBoyIdError = null, // ID is not editable
+            editBoyIdError = null,
             editBoyNameError = null,
             editBoyRoleError = null
         )
@@ -850,7 +845,6 @@ class PreferencesViewModel @Inject constructor(
         )
     }
 
-    // Input change handlers for EditTheBoyDialog
     fun onEditBoyNameChange(name: String) { _uiState.value = _uiState.value.copy(editBoyNameInput = name, editBoyNameError = null) }
     fun onEditBoyRoleChange(role: String) { _uiState.value = _uiState.value.copy(editBoyRoleInput = role, editBoyRoleError = null) }
     fun onEditBoyNotesChange(notes: String) { _uiState.value = _uiState.value.copy(editBoyNotesInput = notes) }
@@ -896,12 +890,10 @@ class PreferencesViewModel @Inject constructor(
     fun onDeleteTheBoy(theBoy: TheBoysInfo) {
         viewModelScope.launch {
             theBoysRepository.deleteTheBoy(theBoy)
-            // Consider if cascading deletes or updates are needed for ProductionActivity logs
             _uiState.value = _uiState.value.copy(snackbarMessage = "'Boy' deleted.")
         }
     }
 
-    // --- Activity Category Management Functions (Existing - No changes needed here) ---
     fun onManageCategoriesClicked() {
         _uiState.value = _uiState.value.copy(showManageCategoriesDialog = true)
     }
@@ -983,7 +975,6 @@ class PreferencesViewModel @Inject constructor(
             return
         }
         if (newName.equals(currentCategory.name, ignoreCase = true)) {
-            // No change, just dismiss
             onDismissEditCategoryDialog()
             return
         }

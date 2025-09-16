@@ -51,7 +51,7 @@ import androidx.compose.ui.platform.LocalContext
 // import androidx.compose.ui.text.font.FontWeight // Not used in this file directly after removals
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel // Corrected import
 // import com.example.worktracker.data.database.entity.WorkActivityLog // Not directly used in this file after removals
 import kotlinx.coroutines.launch
 

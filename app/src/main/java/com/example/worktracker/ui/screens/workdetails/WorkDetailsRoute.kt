@@ -6,7 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel // Corrected import
 import androidx.navigation.NavController
 // It's good practice to ensure all necessary imports are here explicitly
 // import com.example.worktracker.ui.screens.workdetails.GenericWorkDetailsViewModel // Assuming this is the correct FQN

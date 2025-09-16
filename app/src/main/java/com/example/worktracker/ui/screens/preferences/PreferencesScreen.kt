@@ -6,9 +6,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.worktracker.AppRoutes // Import AppRoutes
+import com.example.worktracker.AppRoutes
 import com.example.worktracker.data.database.entity.OperatorInfo
 import com.example.worktracker.data.database.entity.TheBoysInfo
 import com.example.worktracker.ui.components.ConfirmActionPasswordDialog
@@ -46,6 +46,9 @@ fun PreferencesScreen(
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(bottom = 16.dp)
         )
+
+        // Account Section Removed
+        // HorizontalDivider Removed
 
         Button(
             onClick = { viewModel.onShowSetPasswordDialog() },
@@ -102,12 +105,12 @@ fun PreferencesScreen(
         )
         Button(
             onClick = { navController.navigate(AppRoutes.MANAGE_COMPONENTS) }, 
-            modifier = Modifier.padding(bottom = 8.dp) // Adjusted padding
+            modifier = Modifier.padding(bottom = 8.dp)
         ) {
-            Text("Add/Edit Manufacturing Components") // Changed text for clarity
+            Text("Add/Edit Manufacturing Components")
         }
         Button(
-            onClick = { navController.navigate(AppRoutes.VIEW_COMPONENTS) }, // Navigate to new component list screen
+            onClick = { navController.navigate(AppRoutes.VIEW_COMPONENTS) },
             modifier = Modifier.padding(bottom = 16.dp)
         ) {
             Text("List of Components")

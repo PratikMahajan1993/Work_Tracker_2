@@ -1,3 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Work Tracker</string>
+    <string name="default_web_client_id" translatable="false">1055166324687-4cgrfsqku8vo1cuodo16tg3d6mmtguhk.apps.googleusercontent.com</string>
 </resources>

@@ -1,6 +1,7 @@
 package com.example.worktracker
 
 object AppRoutes {
+    const val SIGN_IN_SCREEN = "sign_in_screen"
     const val MAIN_SCREEN = "main_screen"
     const val SELECT_CATEGORY = "select_category" // For LogWorkActivityScreen (category selection)
     // Route for WorkDetailsScreen, categoryName is part of the path, workLogId is an optional query parameter
@@ -8,6 +9,7 @@ object AppRoutes {
     const val LOG_PRODUCTION_ACTIVITY = "log_production_activity?productionLogId={productionLogId}"
     const val MANAGE_COMPONENTS = "manage_components"
     const val VIEW_COMPONENTS = "view_components"
+    const val PREFERENCES_SCREEN = "preferences_screen" // Added PREFERENCES_SCREEN
 
     // Helper function to build the route to work details, supporting create and edit
     fun workDetailsRoute(categoryName: String, workLogId: Long? = null): String {

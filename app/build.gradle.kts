@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.gms.google.services) // Added Google Services plugin
     // id("kotlin-kapt") // Removed for KSP
     id("com.google.dagger.hilt.android") // Added for Hilt
     id("com.google.devtools.ksp") // Added for KSP
@@ -44,12 +45,12 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17 // Updated to JVM 17
+        targetCompatibility = JavaVersion.VERSION_17 // Updated to JVM 17
     }
     kotlin {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) // Updated to JVM 17
         }
     }
     buildFeatures {
@@ -60,6 +61,12 @@ android {
 
 dependencies {
 
+    implementation(platform(libs.firebase.bom)) // Firebase BOM
+    implementation(libs.firebase.auth)      // Firebase Auth
+    implementation(libs.firebase.common)    // Common Firebase utilities
+    implementation(libs.firebase.firestore)
+    // implementation(libs.play.services.auth) // Removed conflicting dependency
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -68,19 +75,23 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material.icons.extended) // Added extended material icons
-    implementation(libs.generativeai) // Added Gemini API
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.generativeai)
 
-    implementation(libs.hilt.android) // Updated Hilt version
-    implementation(libs.androidx.hilt.navigation.compose) // Added Hilt Navigation Compose
-    //kapt("com.google.dagger:hilt-android-compiler:2.57.1") // Removed for KSP
-    ksp(libs.hilt.compiler) // Switched to KSP for Hilt
+    implementation(libs.hilt.android)
+    implementation(libs.androidx.hilt.navigation.compose)
+    ksp(libs.hilt.compiler)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.androidx.navigation.compose)
+
+    // Credential Manager dependencies
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth) // This is the correct one
+    implementation(libs.googleid) // Added for GoogleIdTokenCredential
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

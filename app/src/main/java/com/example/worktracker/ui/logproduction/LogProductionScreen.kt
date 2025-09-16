@@ -12,7 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel // Corrected import
 import androidx.navigation.NavController
 import com.example.worktracker.data.database.entity.ComponentInfo
 import com.example.worktracker.data.database.entity.TheBoysInfo
