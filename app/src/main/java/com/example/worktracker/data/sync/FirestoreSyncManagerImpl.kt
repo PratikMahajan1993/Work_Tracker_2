@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.* // KTX extensions for Firestore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.catch // Import for the catch operator
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
@@ -78,23 +79,23 @@ class FirestoreSyncManagerImpl @Inject constructor(
         collectionName: String
     ): Flow<Result<List<Map<String, Any?>>>> = flow {
         Log.d(TAG, "Fetching entities: userId=$userId, collection=$collectionName")
-        try {
-            val snapshot = firestore.collection("users").document(userId)
-                .collection(collectionName)
-                .get()
-                .await()
-            
-            val documents = snapshot.documents.mapNotNull { document ->
-                document.data?.toMutableMap()?.apply {
-                    put("firestore_document_id", document.id) 
-                }
+        val snapshot = firestore.collection("users").document(userId)
+            .collection(collectionName)
+            .get()
+            .await()
+        
+        val documents = snapshot.documents.mapNotNull { document ->
+            document.data?.toMutableMap()?.apply {
+                put("firestore_document_id", document.id) 
             }
-            Log.d(TAG, "Fetched ${documents.size} entities from $collectionName for user $userId")
-            emit(Result.success(documents))
-        } catch (e: Exception) {
-            Log.e(TAG, "Error fetching entities from $collectionName for user $userId", e)
-            emit(Result.failure(e))
         }
+        Log.d(TAG, "Fetched ${documents.size} entities from $collectionName for user $userId")
+        emit(Result.success(documents))
+    }.catch { e -> // Apply the catch operator to the flow
+        Log.e(TAG, "Error in getEntities flow for $collectionName, user $userId", e)
+        // Do not check for internal AbortFlowException here.
+        // Simply emit the failure for any exception caught.
+        emit(Result.failure(e))
     }
 
     override suspend fun deleteAllUserData(userId: String): Result<Unit> {
