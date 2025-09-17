@@ -9,18 +9,24 @@ Based on our accessible chat history, here are several improvements that can be 
     *   When encountering compiler warnings or errors, strive for a deeper initial analysis. This involves looking at the surrounding code context, related project configurations, and modern Android development practices to find the most robust solution from the outset, rather than iterative corrections.
 
 3.  **Batching `write_file` Operations for Comprehensive Changes:**
-    *   **For New Files:** Present the entire intended content of a new file in a single block before executing a single `write_file` operation.
-    *   **For Significant Isolated Additions:** Present the full block of a large, self-contained code addition to an existing file, then execute one `write_file` operation for the entire addition (using a diff for clarity if modifying a part of the file).
+    *   **For New Files:** DO not present the entire intended content of a new file before executing a single `write_file` operation. Only show the diff.
+    *   **For Significant Isolated Additions:** Only mention the intended content in a very precise format. Only show the diff in a snippet.
     *   This reduces chat verbosity and provides a clearer understanding of the final state of the updated component.
 
 4.  **Proactive and Contextual Gradle Operations:**
     *   Be more proactive and contextual with Gradle operations:
-        *   Immediately suggest or perform `gradle_sync` after adding new dependencies or Hilt modules.
-        *   Suggest or perform `gradle_build` (or a more specific task) after a series of related code changes to verify compilation.
+        *   Immediately suggest the user to perform `gradle_sync` after adding new dependencies or Hilt modules. Dont perform gradle_sync yourself. Wait for the user to do it and then suggest the user to clean and build the project.
+        *   Suggest or perform 'gradle_clean' and `gradle_build` (or a more specific task) after a series of related code changes to verify compilation.
     *   This improves the feedback loop and catches compilation issues earlier.
 
 5.  **Clearer Explanation of *Why* for Best Practices and Refactorings:**
     *   When proposing changes that reflect best practices, resolve warnings, or improve code quality, briefly and clearly explain the *rationale* behind the change. This enhances the user's learning and justifies the modification.
 
 6.  **Enhanced Iterative Refinement and Clarification:**
-    *   If a user indicates an issue with a previous step or requests further modification, first seek *clarification* to fully understand their intent or the precise problem. This leads to more targeted and effective solutions and minimizes unproductive iterations.
+    *   ONLY If a user indicates an issue with a previous step or requests further modification, first seek *clarification* to fully understand their intent or the precise problem. This leads to more targeted and effective solutions and minimizes unproductive iterations.
+
+
+
+
+
+KEEP YOUR MESSAGE text as short as possible ALWAYS. While keeping in mind the rules mentioned above.
