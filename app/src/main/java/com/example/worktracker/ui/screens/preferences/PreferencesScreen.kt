@@ -1,32 +1,25 @@
 package com.example.worktracker.ui.screens.preferences
 
-import android.widget.Toast // Added for Toast
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext // Added for Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.worktracker.AppRoutes
 import com.example.worktracker.data.database.entity.OperatorInfo
 import com.example.worktracker.data.database.entity.TheBoysInfo
-import com.example.worktracker.ui.components.ConfirmActionPasswordDialog
-import com.example.worktracker.ui.components.SetPasswordDialog
-import com.example.worktracker.ui.components.ManageCategoriesDialog
-import com.example.worktracker.ui.components.AddCategoryDialog
-import com.example.worktracker.ui.components.EditCategoryDialog
-import com.example.worktracker.ui.components.TheBoysListDialog
-import com.example.worktracker.ui.components.AddTheBoyDialog
-import com.example.worktracker.ui.components.EditTheBoyDialog
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Login // Added AutoMirrored
-import androidx.compose.material.icons.automirrored.filled.Logout // Added AutoMirrored
-import androidx.compose.material.icons.filled.CloudUpload // Added for the new button
+import com.example.worktracker.ui.components.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,14 +31,14 @@ fun PreferencesScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showDeleteOperatorConfirmDialog by remember { mutableStateOf<OperatorInfo?>(null) }
     var showDeleteTheBoyConfirmDialog by remember { mutableStateOf<TheBoysInfo?>(null) }
-    var showSignOutConfirmDialog by remember { mutableStateOf(false) } // State for sign-out dialog
+    var showSignOutConfirmDialog by remember { mutableStateOf(false) }
 
-    val context = LocalContext.current // For Toast
+    val context = LocalContext.current
 
     LaunchedEffect(key1 = uiState.snackbarMessage) {
         uiState.snackbarMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-            viewModel.clearSnackbarMessage() // Important to prevent re-showing on recomposition
+            viewModel.clearSnackbarMessage()
         }
     }
 
@@ -57,217 +50,92 @@ fun PreferencesScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.Start
     ) {
-        Text(
-            text = "Preferences",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        // Account Management Section
-        Text(
-            text = "Account Management",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-        )
-
+        Text(text = "Preferences", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(bottom = 16.dp))
+        Text(text = "Account Management", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp))
         if (uiState.currentUser == null) {
-            Button(
-                onClick = { viewModel.onSignInClicked() },
-                enabled = !uiState.isAccountActionInProgress && !uiState.isForcePushInProgress,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-            ) {
+            Button(onClick = viewModel::onSignInClicked, enabled = !uiState.isAccountActionInProgress && !uiState.isForcePushInProgress, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 Icon(Icons.AutoMirrored.Filled.Login, contentDescription = "Sign In Icon", modifier = Modifier.size(ButtonDefaults.IconSize))
                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                 Text("Sign In with Google")
             }
         } else {
-            Text(
-                text = "Signed in as: ${uiState.currentUser?.username ?: "User"}",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            Button(
-                onClick = { showSignOutConfirmDialog = true },
-                enabled = !uiState.isAccountActionInProgress && !uiState.isForcePushInProgress,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-            ) {
+            Text(text = "Signed in as: ${uiState.currentUser?.username ?: "User"}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp))
+            Button(onClick = { showSignOutConfirmDialog = true }, enabled = !uiState.isAccountActionInProgress && !uiState.isForcePushInProgress, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Sign Out Icon", modifier = Modifier.size(ButtonDefaults.IconSize))
                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                 Text("Sign Out")
             }
-
-            // New Button for Pushing All Local Data
-            Button(
-                onClick = { viewModel.onForcePushAllLocalDataToFirebase() },
-                enabled = !uiState.isAccountActionInProgress && !uiState.isForcePushInProgress,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-            ) {
+            Button(onClick = viewModel::onForcePushAllLocalDataToFirebase, enabled = !uiState.isAccountActionInProgress && !uiState.isForcePushInProgress, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 Icon(Icons.Filled.CloudUpload, contentDescription = "Push Data Icon", modifier = Modifier.size(ButtonDefaults.IconSize))
                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                 Text("Push All Local Data to Firebase")
             }
         }
         if (uiState.isAccountActionInProgress || uiState.isForcePushInProgress) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                 CircularProgressIndicator()
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.Center) {
+                CircularProgressIndicator()
             }
         }
-
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-        // Other Preference Items from original file
-        Text(
-            text = "App Security & Data",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-        )
-        Button(
-            onClick = { viewModel.onShowSetPasswordDialog() },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-        ) {
+        Text(text = "App Security & Data", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp))
+        Button(onClick = viewModel::onShowSetPasswordDialog, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
             Text(if (uiState.isPasswordSet) "Change Master Reset Password" else "Set Master Reset Password")
         }
-        Button(
-            onClick = { viewModel.onShowSmsContactDialog() },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-        ) {
+        Button(onClick = viewModel::onShowSmsContactDialog, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
             Text(if (uiState.preferredSmsContact != null) "Change Preferred SMS Contact" else "Set Preferred SMS Contact")
         }
         uiState.preferredSmsContact?.let {
-            Text(
-                text = "Current SMS Contact: $it",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(start = 8.dp, bottom = 16.dp)
-            )
+            Text(text = "Current SMS Contact: $it", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 8.dp, bottom = 16.dp))
         }
-        Button(
-            onClick = { viewModel.onShowSetGeminiApiKeyDialog() },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-        ) {
+        Button(onClick = viewModel::onShowSetGeminiApiKeyDialog, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
             Text(if (uiState.isGeminiApiKeySet) "Change Gemini API Key" else "Set Gemini API Key")
         }
-        Text(
-            text = if (uiState.isGeminiApiKeySet) "Gemini API Key: Set" else "Gemini API Key: Not Set",
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(start = 8.dp, bottom = 16.dp)
-        )
-
+        Text(text = if (uiState.isGeminiApiKeySet) "Gemini API Key: Set" else "Gemini API Key: Not Set", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 8.dp, bottom = 16.dp))
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-        Text(
-            text = "Activity Categories",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-        )
-        Button(
-            onClick = { viewModel.onManageCategoriesClicked() },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-        ) {
+        Text(text = "Activity Categories", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp))
+        Button(onClick = viewModel::onManageCategoriesClicked, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
             Text("Manage Activity Categories")
         }
-
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-        // Manufacturing Components Section
-        Text(
-            text = "Manufacturing Components",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-        )
-        Button(
-            onClick = { navController.navigate(AppRoutes.MANAGE_COMPONENTS) },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-        ) {
+        Text(text = "Manufacturing Components", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp))
+        Button(onClick = { navController.navigate(AppRoutes.MANAGE_COMPONENTS) }, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
             Text("Add/Edit Manufacturing Components")
         }
-        Button(
-            onClick = { navController.navigate(AppRoutes.VIEW_COMPONENTS) },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-        ) {
+        Button(onClick = { navController.navigate(AppRoutes.VIEW_COMPONENTS) }, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
             Text("List of Components")
         }
-
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-        Text(
-            text = "Operator Management",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-        )
-        Button(
-            onClick = { viewModel.onOperatorSectionClicked() },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-        ) {
+        Text(text = "Operator Management", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp))
+        Button(onClick = viewModel::onOperatorSectionClicked, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
             Text(if (uiState.isOperatorSectionUnlocked) "Access Operator Information" else "Unlock Operator Information")
         }
-
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-        Text(
-            text = "'The Boys' Management",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-        )
-        Button(
-            onClick = { viewModel.onTheBoysSectionClicked() },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-        ) {
+        Text(text = "'The Boys' Management", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp))
+        Button(onClick = viewModel::onTheBoysSectionClicked, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
             Text(if (uiState.isOperatorSectionUnlocked) "Access 'The Boys' Information" else "Unlock 'The Boys' Information")
         }
-
         Spacer(modifier = Modifier.weight(1f))
-
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ){
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             if (uiState.isPasswordSet) {
-                Button(
-                    onClick = { viewModel.onMasterResetClicked() },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
-                    )
-                ) {
+                Button(onClick = viewModel::onMasterResetClicked, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError)) {
                     Text("Master Reset (Wipe All Data)")
                 }
             } else {
-                Text(
-                    "Set a password to enable Master Reset.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Text("Set a password to enable Master Reset.", style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
 
-    // Sign Out Confirmation Dialog
     if (showSignOutConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showSignOutConfirmDialog = false },
             title = { Text("Confirm Sign Out") },
             text = { Text("Are you sure you want to sign out?") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.onSignOutClicked()
-                        showSignOutConfirmDialog = false
-                    }
-                ) {
-                    Text("Sign Out")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showSignOutConfirmDialog = false }) {
-                    Text("Cancel")
-                }
-            }
+            confirmButton = { Button(onClick = { viewModel.onSignOutClicked(); showSignOutConfirmDialog = false }) { Text("Sign Out") } },
+            dismissButton = { TextButton(onClick = { showSignOutConfirmDialog = false }) { Text("Cancel") } }
         )
     }
 
-    // Existing Dialogs
     SetPasswordDialog(
         showDialog = uiState.showSetPasswordDialog,
         newPasswordInput = uiState.newPasswordInput,
@@ -279,7 +147,6 @@ fun PreferencesScreen(
         onConfirm = viewModel::onSavePasswordAttempt,
         onDismiss = viewModel::onDismissSetPasswordDialog
     )
-
     ConfirmActionPasswordDialog(
         showDialog = uiState.showMasterResetConfirmationDialog,
         title = "Confirm Master Reset",
@@ -289,7 +156,6 @@ fun PreferencesScreen(
         onConfirm = viewModel::onConfirmMasterReset,
         onDismiss = viewModel::onDismissMasterResetConfirmationDialog
     )
-
     SetSmsContactDialog(
         showDialog = uiState.showSmsContactDialog,
         smsContactInput = uiState.smsContactInput,
@@ -298,7 +164,6 @@ fun PreferencesScreen(
         onConfirm = viewModel::onSaveSmsContact,
         onDismiss = viewModel::onDismissSmsContactDialog
     )
-
     SetGeminiApiKeyDialog(
         showDialog = uiState.showSetGeminiApiKeyDialog,
         apiKeyInput = uiState.geminiApiKeyInput,
@@ -307,7 +172,6 @@ fun PreferencesScreen(
         onConfirm = viewModel::onSaveGeminiApiKey,
         onDismiss = viewModel::onDismissSetGeminiApiKeyDialog
     )
-
     OperatorPasswordDialog(
         showDialog = uiState.showOperatorPasswordDialog,
         passwordAttempt = uiState.operatorPasswordAttempt,
@@ -316,16 +180,14 @@ fun PreferencesScreen(
         onConfirm = viewModel::onUnlockSectionAttempt,
         onDismiss = viewModel::onDismissOperatorPasswordDialog
     )
-
     OperatorPasswordDialog(
         showDialog = uiState.showTheBoysPasswordDialog,
         passwordAttempt = uiState.operatorPasswordAttempt,
         passwordError = uiState.operatorPasswordError,
         onPasswordChange = viewModel::onOperatorPasswordAttemptChange,
         onConfirm = viewModel::onUnlockSectionAttempt,
-        onDismiss = { viewModel.onDismissOperatorPasswordDialog() } // Assuming same dismissal logic as operator pwd dialog
+        onDismiss = viewModel::onDismissOperatorPasswordDialog
     )
-
     OperatorListDialog(
         showDialog = uiState.showOperatorListDialog,
         operators = uiState.operators,
@@ -334,12 +196,10 @@ fun PreferencesScreen(
         onEditOperatorClicked = viewModel::onEditOperatorClicked,
         onDeleteOperatorClicked = { operator -> showDeleteOperatorConfirmDialog = operator }
     )
-
     EditOperatorDialog(
         showDialog = uiState.showEditOperatorDialog,
         editingOperator = uiState.editingOperator,
         uiState = uiState,
-        onIdChange = { /* ID not editable */ },
         onNameChange = viewModel::onOperatorNameChange,
         onHourlySalaryChange = viewModel::onOperatorHourlySalaryChange,
         onRoleChange = viewModel::onOperatorRoleChange,
@@ -349,7 +209,6 @@ fun PreferencesScreen(
         onConfirm = viewModel::onSaveEditOperator,
         onDismiss = viewModel::onDismissEditOperatorDialog
     )
-
     AddOperatorDialog(
         showDialog = uiState.showAddOperatorDialog,
         uiState = uiState,
@@ -359,31 +218,15 @@ fun PreferencesScreen(
         onSave = viewModel::onSaveNewOperator,
         onDismiss = viewModel::onDismissAddOperatorDialog
     )
-
-    showDeleteOperatorConfirmDialog?.let {
+    showDeleteOperatorConfirmDialog?.let { operator ->
         AlertDialog(
             onDismissRequest = { showDeleteOperatorConfirmDialog = null },
             title = { Text("Confirm Delete Operator") },
-            text = { Text("Are you sure you want to delete operator '${it.name}'? This action cannot be undone.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.onDeleteOperator(it)
-                        showDeleteOperatorConfirmDialog = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteOperatorConfirmDialog = null }) {
-                    Text("Cancel")
-                }
-            }
+            text = { Text("Are you sure you want to delete operator '${operator.name}'? This action cannot be undone.") },
+            confirmButton = { Button(onClick = { viewModel.onDeleteOperator(operator); showDeleteOperatorConfirmDialog = null }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = { showDeleteOperatorConfirmDialog = null }) { Text("Cancel") } }
         )
     }
-
     TheBoysListDialog(
         showDialog = uiState.showTheBoysListDialog,
         theBoys = uiState.theBoysList,
@@ -392,7 +235,6 @@ fun PreferencesScreen(
         onEditBoyClicked = viewModel::onEditTheBoyClicked,
         onDeleteBoyClicked = { boy -> showDeleteTheBoyConfirmDialog = boy }
     )
-
     AddTheBoyDialog(
         showDialog = uiState.showAddTheBoyDialog,
         uiState = uiState,
@@ -402,7 +244,6 @@ fun PreferencesScreen(
         onSave = viewModel::onSaveNewTheBoy,
         onDismiss = viewModel::onDismissAddTheBoyDialog
     )
-
     EditTheBoyDialog(
         showDialog = uiState.showEditTheBoyDialog,
         editingTheBoy = uiState.editingTheBoy,
@@ -414,31 +255,15 @@ fun PreferencesScreen(
         onConfirm = viewModel::onSaveEditTheBoy,
         onDismiss = viewModel::onDismissEditTheBoyDialog
     )
-
-    showDeleteTheBoyConfirmDialog?.let {
+    showDeleteTheBoyConfirmDialog?.let { boy ->
         AlertDialog(
             onDismissRequest = { showDeleteTheBoyConfirmDialog = null },
             title = { Text("Confirm Delete 'Boy'") },
-            text = { Text("Are you sure you want to delete '${it.name}'? This action cannot be undone.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.onDeleteTheBoy(it)
-                        showDeleteTheBoyConfirmDialog = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteTheBoyConfirmDialog = null }) {
-                    Text("Cancel")
-                }
-            }
+            text = { Text("Are you sure you want to delete '${boy.name}'? This action cannot be undone.") },
+            confirmButton = { Button(onClick = { viewModel.onDeleteTheBoy(boy); showDeleteTheBoyConfirmDialog = null }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = { showDeleteTheBoyConfirmDialog = null }) { Text("Cancel") } }
         )
     }
-
     ManageCategoriesDialog(
         showDialog = uiState.showManageCategoriesDialog,
         categories = uiState.activityCategories,
@@ -447,7 +272,6 @@ fun PreferencesScreen(
         onEditCategoryClicked = viewModel::onEditCategoryClicked,
         onDeleteCategoryClicked = viewModel::onDeleteCategory
     )
-
     AddCategoryDialog(
         showDialog = uiState.showAddCategoryDialog,
         categoryNameInput = uiState.newCategoryInput,
@@ -456,7 +280,6 @@ fun PreferencesScreen(
         onConfirm = viewModel::onSaveNewCategory,
         onDismiss = viewModel::onDismissAddCategoryDialog
     )
-
     EditCategoryDialog(
         showDialog = uiState.showEditCategoryDialog,
         editingCategory = uiState.editingCategory,

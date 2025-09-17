@@ -9,16 +9,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.worktracker.data.database.entity.OperatorInfo // Keep this import
+import com.example.worktracker.data.database.entity.OperatorInfo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditOperatorDialog(
     showDialog: Boolean,
-    // editingOperator is expected to be non-null when showDialog is true for this dialog
     editingOperator: OperatorInfo?, 
-    uiState: PreferencesUiState, // Pass the relevant part of the UI state
-    onIdChange: (String) -> Unit, // Still needed to display the ID, though not changeable
+    uiState: PreferencesUiState,
     onNameChange: (String) -> Unit,
     onHourlySalaryChange: (String) -> Unit,
     onRoleChange: (String) -> Unit,
@@ -31,7 +29,7 @@ fun EditOperatorDialog(
     if (showDialog && editingOperator != null) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Edit Operator") }, // Fixed title
+            title = { Text("Edit Operator") },
             text = {
                 Column(
                     modifier = Modifier
@@ -39,20 +37,8 @@ fun EditOperatorDialog(
                         .verticalScroll(rememberScrollState())
                 ) {
                     // Operator ID (Display only, not editable)
-                    OutlinedTextField(
-                        value = uiState.operatorIdInput, // Display current ID from uiState
-                        onValueChange = { /* No-op, ID is not changed during edit */ },
-                        label = { Text("Operator ID") }, // Removed asterisk, not an input
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        isError = uiState.operatorIdError != null, // Still show error if one was somehow set
-                        enabled = false, // ID is not editable
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    uiState.operatorIdError?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Operator ID: ${editingOperator.operatorId}", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // Operator Name
                     OutlinedTextField(
@@ -132,7 +118,7 @@ fun EditOperatorDialog(
             },
             confirmButton = {
                 Button(onClick = onConfirm) {
-                    Text("Save Changes") // Changed button text for clarity
+                    Text("Save Changes")
                 }
             },
             dismissButton = {

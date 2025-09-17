@@ -13,10 +13,10 @@ import kotlinx.coroutines.flow.Flow
 interface OperatorInfoDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(operatorInfo: OperatorInfo)
+    suspend fun insert(operatorInfo: OperatorInfo): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertAllOperators(operators: List<OperatorInfo>) // New method for SyncWorker
+    suspend fun upsertAllOperators(operators: List<OperatorInfo>)
 
     @Update
     suspend fun update(operatorInfo: OperatorInfo)
@@ -29,4 +29,7 @@ interface OperatorInfoDao {
 
     @Query("SELECT * FROM operator_info WHERE operatorId = :id")
     suspend fun getOperatorById(id: Int): OperatorInfo?
+    
+    @Query("DELETE FROM sqlite_sequence WHERE name='operator_info'")
+    suspend fun resetAutoIncrement()
 }

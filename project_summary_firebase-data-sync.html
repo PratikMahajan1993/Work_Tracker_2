@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Summary: Work Tracker (firebase-data-sync branch)</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }
+        h1, h2, h3, h4 { color: #333; }
+        h1 { font-size: 2em; }
+        h2 { font-size: 1.75em; border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 30px;}
+        h3 { font-size: 1.5em; margin-top: 25px;}
+        h4 { font-size: 1.25em; margin-top: 20px;}
+        code { background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; font-family: "Courier New", Courier, monospace; }
+        .code-block { background-color: #f4f4f4; padding: 15px; border-radius: 5px; white-space: pre-wrap; font-family: "Courier New", Courier, monospace; }
+        .file-tree { list-style-type: none; padding-left: 0; }
+        .file-tree li { padding: 2px 0; }
+        .file-tree .dir { font-weight: bold; }
+        .file-tree .dir::before { content: '📁 '; }
+        .file-tree .file::before { content: '📄 '; }
+        .comment { color: #888; font-style: italic; margin-left: 15px; }
+    </style>
+</head>
+<body>
+    <h1>Project Summary: Work Tracker</h1>
+    <p><strong>Branch:</strong> <code>firebase-data-sync</code></p>
+
+    <h2>1) Complete App Structure</h2>
+
+    <h3 id="routemap">a) Brief App Routemap</h3>
+    <p>The application's entry point is the <code>MainActivity</code>. On startup, it checks if a user is already signed in via Google.
+        <ul>
+            <li>If a user is signed in, the app navigates directly to the <code>MainScreen</code>.</li>
+            <li>If no user is signed in, it presents the <code>SignInScreen</code>, offering Google Sign-In or continuing as a guest.</li>
+        </ul>
+        The <code>MainScreen</code> is the core of the app, featuring a bottom navigation bar that allows the user to switch between the main sections: <strong>Dashboard</strong>, <strong>History</strong>, <strong>Reports</strong>, and <strong>Preferences</strong>. From these main sections, users can navigate to more specific screens for logging/editing work, managing components, and adjusting settings.
+    </p>
+
+    <h3 id="nav-routes">b) App Navigation Routes</h3>
+    <div class="code-block">
+        <ul>
+            <li><code>sign_in_screen</code>: The initial screen for user authentication.</li>
+            <li><code>main_screen</code>: The main hub of the app, containing the bottom navigation bar.</li>
+            <li><code>select_category</code>: Screen to choose a work activity category before logging details.</li>
+            <li><code>work_details/{categoryName}?workLogId={workLogId}</code>: Screen for creating a new or editing an existing work activity log.</li>
+            <li><code>log_production_activity?productionLogId={productionLogId}</code>: Screen for creating or editing a production activity log.</li>
+            <li><code>preferences_screen</code>: Main screen for all app settings.</li>
+            <li><code>manage_components</code>: Screen to add a new manufacturing component.</li>
+            <li><code>manage_components/{componentId}</code>: Screen to edit an existing manufacturing component.</li>
+            <li><code>view_components</code>: A list view of all manufacturing components.</li>
+        </ul>
+        <strong>Nested Routes within MainScreen (Bottom Navigation):</strong>
+        <ul>
+            <li><code>dashboard</code>: The landing page after sign-in, showing ongoing and recent activities.</li>
+            <li><code>history</code>: A comprehensive list of all past work and production logs.</li>
+            <li><code>reports</code>: A hub for generating and exporting reports (e.g., as PDF or SMS).</li>
+            <li><code>chatbot</code>: A placeholder screen for a future AI chatbot feature.</li>
+            <li><code>preferences</code>: (Navigates to the top-level <code>preferences_screen</code> route).</li>
+        </ul>
+    </div>
+
+    <h3 id="screens">c) Details of Various Screens</h3>
+    <h4>1. SignInScreen</h4>
+    <p><strong>File:</strong> <code>ui/signin/SignInScreen.kt</code><br>
+       <strong>ViewModel:</strong> <code>ui/signin/SignInViewModel.kt</code><br>
+       This is the initial authentication screen. It provides a "Sign in with Google" button and a "Continue as Guest" option. The UI is simple, showing a loading indicator during the sign-in process. The ViewModel handles the sign-in logic using the <code>GoogleAuthUiClient</code> and communicates success or failure back to the UI via a <code>SharedFlow</code> of events, which triggers navigation or displays toasts.</p>
+
+    <h4>2. MainScreen</h4>
+    <p><strong>File:</strong> <code>ui/MainScreen.kt</code><br>
+       This screen acts as the main container after login. It sets up a <code>Scaffold</code> with a <code>BottomNavBar</code>. A nested <code>NavHost</code> (<code>bottomNavController</code>) manages the content area, switching between the Dashboard, History, Reports, and Preferences screens based on the user's selection from the bottom bar.</p>
+
+    <h4>3. DashboardScreen</h4>
+    <p><strong>File:</strong> <code>ui/screens/dashboard/DashboardScreen.kt</code><br>
+       <strong>ViewModel:</strong> <code>ui/screens/dashboard/DashboardViewModel.kt</code><br>
+       The landing page of the app. It displays a summary of "Ongoing Activities" and "Recent Work" in collapsible cards. If there is no data, it shows a welcome message with buttons to log new activities. The ViewModel combines data from both work and production repositories to create a unified timeline for the UI.</p>
+
+    <h4>4. HistoryScreen</h4>
+    <p><strong>File:</strong> <code>ui/screens/history/HistoryScreen.kt</code><br>
+       <strong>ViewModel:</strong> <code>ui/screens/history/HistoryViewModel.kt</code><br>
+       Displays a complete, scrollable list of all past work and production logs. Each item can be expanded to show more details, including options to "Edit" or "Delete" the log. A confirmation dialog is shown before deleting an entry. The ViewModel is responsible for fetching and combining all log types and handling delete operations.</p>
+
+    <h4>5. ReportsHubScreen</h4>
+    <p><strong>File:</strong> <code>ui/reports/ReportsHubScreen.kt</code><br>
+       <strong>ViewModel:</strong> <code>ui/reports/ReportsViewModel.kt</code><br>
+       A central screen offering various reporting and export functionalities. Users can choose to send activity details via SMS or export a work log as a PDF. The UI presents these options as clickable cards, which trigger dialogs to select the specific log for the action. The ViewModel orchestrates the data fetching, content generation (for SMS/PDF), and triggers system intents (e.g., opening the SMS app).</p>
+
+    <h4>6. PreferencesScreen</h4>
+    <p><strong>File:</strong> <code>ui/screens/preferences/PreferencesScreen.kt</code><br>
+       <strong>ViewModel:</strong> <code>ui/screens/preferences/PreferencesViewModel.kt</code><br>
+       A comprehensive screen for managing all application settings. This includes:
+       <ul>
+           <li><strong>Account Management:</strong> Signing in/out and forcing a push of all local data to Firebase.</li>
+           <li><strong>App Security:</strong> Setting/changing a master password for data wipes.</li>
+           <li><strong>Data Management:</strong> Managing activity categories, manufacturing components, operators, and "The Boys" (personnel). These options often open complex dialog flows for adding, editing, and deleting entries.</li>
+           <li><strong>Configuration:</strong> Setting a preferred SMS contact and a Gemini API key.</li>
+           <li><strong>Master Reset:</strong> A button to wipe all local application data, protected by the master password.</li>
+       </ul>
+       The ViewModel is the most complex in the app, managing a large UI state and interacting with SharedPreferences and multiple repositories.</p>
+
+    <h4>7. LogWorkActivityScreen & WorkDetailsScreen</h4>
+    <p><strong>Files:</strong> <code>ui/logwork/LogWorkActivityScreen.kt</code>, <code>ui/screens/workdetails/WorkDetailsScreen.kt</code><br>
+       <strong>ViewModels:</strong> <code>ui/logwork/LogWorkViewModel.kt</code>, <code>ui/screens/workdetails/GenericWorkDetailsViewModel.kt</code><br>
+       This two-screen flow is for logging operator work activities.
+       <ol>
+           <li><code>LogWorkActivityScreen</code>: The user first selects an activity category from a list. Categories with ongoing timers are highlighted.</li>
+           <li><code>WorkDetailsScreen</code>: After selecting a category, the user is taken here to fill in the details. This screen handles both creating new logs and editing existing ones. The user can start a timer, fill in a description, operator ID, expenses, associate components, and save the log, which stops the timer and calculates the duration. The ViewModel manages the state of the log being created or edited, including validation and interaction with the repository.</li>
+       </ol>
+    </p>
+
+    <h4>8. LogProductionScreen</h4>
+    <p><strong>File:</strong> <code>ui/logproduction/LogProductionScreen.kt</code><br>
+       <strong>ViewModel:</strong> <code>ui/logproduction/LogProductionViewModel.kt</code><br>
+       This screen is dedicated to logging manufacturing production runs. It's a form where the user selects a "Boy" (operator), a component, and enters the machine number and production/rejection quantities. Unlike the work log, the duration is calculated based on a user-provided start time and downtime, rather than a real-time timer. The ViewModel handles fetching the lists of boys and components, validating all inputs, and saving the final production log.</p>
+
+    <h3 id="file-dir">d) Complete File Directory with Comments</h3>
+    <ul class="file-tree">
+        <li class="dir">java
+            <ul class="file-tree">
+                <li class="dir">com/example/worktracker
+                    <ul class="file-tree">
+                        <li class="dir">core <span class="comment">- Core utility classes, helpers, and services.</span>
+                            <ul class="file-tree">
+                                <li class="file">PdfGenerator.kt <span class="comment">- Handles the creation of PDF reports from work log data.</span></li>
+                            </ul>
+                        </li>
+                        <li class="dir">data <span class="comment">- Contains the entire data layer: database, repositories, sync logic.</span>
+                            <ul class="file-tree">
+                                <li class="dir">database <span class="comment">- Room database setup, DAOs, entities, and type converters.</span>
+                                    <ul class="file-tree">
+                                        <li class="dir">dao <span class="comment">- Data Access Objects (Interfaces for DB queries).</span></li>
+                                        <li class="dir">entity <span class="comment">- @Entity classes representing database tables.</span></li>
+                                        <li class="dir">mappers <span class="comment">- Functions to map data entities to/from Firestore data format.</span></li>
+                                        <li class="dir">relation <span class="comment">- Defines relationships between entities (e.g., a work log with its components).</span></li>
+                                        <li class="file">AppDatabase.kt <span class="comment">- The main Room database class, defines tables, version, and migrations.</span></li>
+                                    </ul>
+                                </li>
+                                <li class="dir">repository <span class="comment">- Repository pattern implementations, abstracting data sources.</span></li>
+                                <li class="dir">sync <span class="comment">- Logic for syncing data with Firebase Firestore.</span>
+                                    <ul class="file-tree">
+                                        <li class="file">FirestoreSyncManagerImpl.kt <span class="comment">- Implements the logic to fetch/upload/delete data collections from Firestore.</span></li>
+                                        <li class="file">IFirestoreSyncManager.kt <span class="comment">- Interface for the Firestore sync manager.</span></li>
+                                        <li class="file">SyncWorker.kt <span class="comment">- A WorkManager worker that performs the background data download from Firestore to Room.</span></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="dir">di <span class="comment">- Dependency Injection setup using Hilt.</span>
+                            <ul class="file-tree">
+                                <li class="file">AppModule.kt <span class="comment">- Hilt module providing application-wide dependencies (Database, Repositories, SharedPreferences, etc.).</span></li>
+                                <li class="file">DatabaseModule.kt <span class="comment">- Deprecated. DI consolidated into AppModule.</span></li>
+                            </ul>
+                        </li>
+                        <li class="dir">navigation <span class="comment">- Navigation-related sealed classes and constants.</span>
+                            <ul class="file-tree">
+                                <li class="file">BottomNavScreen.kt <span class="comment">- Defines the screens available in the MainScreen's bottom navigation bar.</span></li>
+                            </ul>
+                        </li>
+                        <li class="dir">ui <span class="comment">- Contains all UI-related code, including screens, ViewModels, and components.</span>
+                            <ul class="file-tree">
+                                <li class="dir">components <span class="comment">- Reusable Jetpack Compose UI components (e.g., custom dialogs).</span></li>
+                                <li class="dir">logproduction <span class="comment">- Screen and ViewModel for logging production.</span></li>
+                                <li class="dir">logwork <span class="comment">- Screen and ViewModel for selecting a work category.</span></li>
+                                <li class="dir">reports <span class="comment">- Screens and ViewModel for the reports hub and its dialogs.</span></li>
+                                <li class="dir">screens <span class="comment">- Main app screens organized by feature (Dashboard, History, Preferences, WorkDetails).</span></li>
+                                <li class="dir">signin <span class="comment">- UI and logic for the Google Sign-In screen.</span></li>
+                                <li class="dir">theme <span class="comment">- Jetpack Compose theme, colors, and typography.</span></li>
+                                <li class="file">MainScreen.kt <span class="comment">- The main UI container with the bottom navigation bar.</span></li>
+                            </ul>
+                        </li>
+                        <li class="dir">workers <span class="comment">- Custom WorkManager workers.</span>
+                            <ul class="file-tree">
+                                <li class="file">UploadAllDataWorker.kt <span class="comment">- Worker responsible for pushing all local data to Firestore upon user request.</span></li>
+                            </ul>
+                        </li>
+                        <li class="file">AppRoutes.kt <span class="comment">- Defines all navigation route constants and helper functions.</span></li>
+                        <li class="file">GeminiProService.kt <span class="comment">- Service for interacting with the Google Gemini API.</span></li>
+                        <li class="file">MainActivity.kt <span class="comment">- The single activity and entry point of the app, hosts the main NavHost.</span></li>
+                        <li class="file">MyApplication.kt <span class="comment">- The Application class, annotated with @HiltAndroidApp.</span></li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+    </ul>
+
+    <h3 id="other-details">e) Any other details that might help with understanding the App</h3>
+    <p>The app relies heavily on password-protected sections within the Preferences screen to manage sensitive or administrative data like operator info, categories, and components. These passwords are not stored in the database but are checked against values in the <code>BuildConfig</code>, which are loaded from a <code>local.properties</code> file not committed to version control. This provides a simple security gate for administrative functions.</p>
+
+    <h2>2) Coding Conventions and Techniques Used</h2>
+
+    <h3 id="good-practices">a) List of all the good practises used in the architecture.</h3>
+    <ul>
+        <li><strong>MVVM Architecture:</strong> The app strictly follows the Model-View-ViewModel architecture pattern. Views (Compose Screens) are responsible for UI, ViewModels handle business logic and state, and the Model (Repositories, Database) manages data.</li>
+        <li><strong>Repository Pattern:</strong> The repository pattern is used to abstract data sources. ViewModels interact with repositories, not directly with DAOs or network clients. This decouples the UI/business logic from the data sources.</li>
+        <li><strong>Single-Activity Architecture:</strong> The app uses a single <code>MainActivity</code> and navigates between different screens using Jetpack Compose Navigation, which is the modern standard for Android UI development.</li>
+        <li><strong>Dependency Injection:</strong> Hilt is used for managing dependencies, which promotes loose coupling and makes the code more modular, testable, and maintainable.</li>
+        <li><strong>UI State Management:</strong> Each screen's state is encapsulated in a dedicated data class (e.g., <code>DashboardUiState</code>) and exposed from the ViewModel as a Kotlin <code>StateFlow</code>. This ensures the UI is a reactive function of the state.</li>
+        <li><strong>Offline-First with Sync:</strong> The app is designed to be offline-first. All data is written to and read from the local Room database, making the app responsive and usable without a network connection. Data is then synchronized with Firebase Firestore for backup and multi-device access.</li>
+        <li><strong>Background Processing:</strong> WorkManager is used for background tasks like downloading data from Firestore (<code>SyncWorker</code>) and uploading all local data (<code>UploadAllDataWorker</code>), ensuring these operations are deferrable and robust.</li>
+    </ul>
+
+    <h3 id="di-firebase">b) Details about things like Hilt DI, firebase integration etc. being used.</h3>
+    <h4>Hilt DI</h4>
+    <p>Hilt is used as the dependency injection framework. The <code>@HiltAndroidApp</code> annotation is on the <code>MyApplication</code> class. Dependencies are defined in <code>di/AppModule.kt</code> and provided as singletons or factory-created instances. This includes providing the Room database, DAOs, repositories, SharedPreferences, Firebase services, and WorkManager.</p>
+    <h4>Firebase Integration</h4>
+    <ul>
+        <li><strong>Firebase Authentication:</strong> Used for user sign-in via Google. The <code>GoogleAuthUiClient</code> class encapsulates the logic for creating sign-in requests and handling results from the Google Identity Services (Credential Manager).</li>
+        <li><strong>Firebase Firestore:</strong> Used as the cloud backend for data storage and backup. The data is structured under a top-level <code>users</code> collection, with each user's data stored in subcollections (e.g., <code>work_activity_logs</code>, <code>operator_info</code>) within their own user document. This ensures data is properly segregated per user.</li>
+    </ul>
+
+    <h3 id="ui-details">c) Details about the UI (Mention what libraries and practises are used)</h3>
+    <p>The entire UI is built with **Jetpack Compose**.
+    <ul>
+        <li><strong>Material 3:</strong> The app uses the Material 3 design system for its components (<code>Scaffold</code>, <code>Card</code>, <code>Button</code>, <code>OutlinedTextField</code>, etc.), providing a modern look and feel.</li>
+        <li><strong>Compose Navigation:</strong> Navigation between screens is handled by the Jetpack Compose Navigation library (<code>NavHost</code>, <code>NavHostController</code>). Routes are defined in a centralized <code>AppRoutes.kt</code> object.</li>
+        <li><strong>State Hoisting:</strong> State is managed in the ViewModels and "hoisted" up from the composables. Composables receive state and lambdas for actions, making them largely stateless and easier to preview and test.</li>
+        <li><strong>Animations:</strong> Simple fade-in/fade-out animations are used for screen transitions in the NavHost to provide a smoother user experience. <code>AnimatedVisibility</code> is used within screens to show/hide UI elements based on state.</li>
+    </ul>
+    </p>
+
+    <h3 id="databases">d) Details of Databases used to store user input. (Explain in detail)</h3>
+    <p>The app uses a dual-database strategy: a local Room database for offline-first capabilities and Google's Firebase Firestore as a cloud-based backup and sync target.</p>
+    <h4>Room Database (Local)</h4>
+    <p><strong>File:</strong> <code>data/database/AppDatabase.kt</code><br>
+    This is the primary source of truth for the application while it is running. It is a relational database on the device.
+    <ul>
+        <li><strong>Entities:</strong> The database consists of several tables, including <code>work_activity_logs</code>, <code>production_activity</code>, <code>operator_info</code>, <code>component_info</code>, <code>the_boys_info</code>, and <code>activity_categories</code>. A cross-reference table (<code>work_activity_component_cross_ref</code>) manages the many-to-many relationship between work logs and components.</li>
+        <li><strong>DAOs (Data Access Objects):</strong> Each entity has a corresponding DAO interface that defines all the necessary Create, Read, Update, and Delete (CRUD) operations. These DAOs often return data wrapped in Kotlin's <code>Flow</code>, allowing the UI to reactively update when the underlying data changes.</li>
+        <li><strong>Migrations:</strong> The database includes a comprehensive set of migration paths to handle schema changes as the app has evolved, ensuring users do not lose their data when updating the app.</li>
+    </ul>
+    </p>
+    <h4>Firebase Firestore (Cloud)</h4>
+    <p>This NoSQL document database serves as the cloud backend.
+    <ul>
+        <li><strong>Structure:</strong> Data is organized in a user-centric way. A top-level <code>users</code> collection contains documents, where each document ID is a user's Firebase Auth UID. Within each user document, subcollections are created that mirror the Room database tables (e.g., a <code>work_activity_logs</code> subcollection).</li>
+        <li><strong>Purpose:</strong> It provides data backup, persistence across app reinstalls, and a foundation for potential multi-device data synchronization in the future.</li>
+    </ul>
+    </p>
+
+    <h3 id="sync-logic">e) Details of how the local room database functions are applied and how it is synced with firebase project data.</h3>
+    <p>The synchronization is designed to be one-way (Firestore to Room) for background downloads, and event-driven (Room to Firestore) for uploads.</p>
+    <h4>1. Uploading (Local to Cloud)</h4>
+    <p>This happens in real-time as data is modified locally.
+    <ul>
+        <li><strong>Trigger:</strong> When a user creates, updates, or deletes an entity via the app's UI, the corresponding Repository method is called (e.g., <code>workActivityRepository.insertWorkActivity()</code>).</li>
+        <li><strong>Process:</strong> The repository method first performs the operation on the local Room database via its DAO. After the local operation is successful, it launches a coroutine in a dedicated I/O scope. Within this coroutine, it calls the <code>FirestoreSyncManager</code> to upload or delete the same entity in Firestore. A <code>last_modified</code> timestamp is added to each record to help with potential future conflict resolution.</li>
+        <li><strong>User Experience:</strong> This happens in the background. The UI updates instantly based on the Room database change, so the user is not blocked by the network operation.</li>
+    </ul>
+    </p>
+    <h4>2. Downloading (Cloud to Local)</h4>
+    <p>This is handled by a <code>WorkManager</code> background task.
+    <ul>
+        <li><strong>Trigger:</strong> A <code>SyncWorker</code> is enqueued when a user successfully signs in. This ensures that the latest data from the cloud is pulled down to the local device at the start of a session.</li>
+        <li><strong>Process:</strong> The <code>SyncWorker</code> iterates through a list of known data collections. For each collection, it calls the <code>FirestoreSyncManager.getEntities()</code> method to fetch all documents from the corresponding Firestore subcollection for the current user. It then uses custom mapper functions to convert the Firestore data maps into the appropriate Room entity objects. Finally, it calls the relevant DAO's "upsert" method (e.g., <code>operatorInfoDao.upsertAllOperators()</code>) to insert or replace the data in the local Room database.</li>
+        <li><strong>User Experience:</strong> This runs in the background without interrupting the user. Because the UI is observing the Room database via <code>Flow</code>, any changes downloaded by the worker will automatically be reflected in the UI once the sync is complete.</li>
+    </ul>
+    </p>
+
+    <h3 id="future-dev-notes">f) Any other details that might be helpful in future activities which will develop the app.</h3>
+    <ul>
+        <li>The current sync logic is robust for single-device usage but lacks a mechanism for resolving conflicts in a multi-device scenario (e.g., if the user modifies the same record on two devices while one is offline). Implementing a conflict resolution strategy using the <code>last_modified</code> timestamp would be a necessary future improvement for multi-device support.</li>
+        <li>The use of passwords from <code>BuildConfig</code> for section access is simple but not highly secure. For a production app, this might be replaced with a more robust role-based access control system managed from a backend.</li>
+        <li>The <code>GeminiProService</code> is integrated but its use appears to be for generating SMS content previews. Its capabilities could be expanded for more advanced AI features, like providing insights on work patterns or summarizing reports.</li>
+    </ul>
+
+    <h2>3) The Purpose of the app and any future developments.</h2>
+    <h4>Purpose of the App</h4>
+    <p>Work Tracker is a comprehensive mobile application designed for tracking and managing work-related activities in a manufacturing or operational environment. Its primary purpose is to provide a robust, offline-capable tool for operators and managers to log detailed information about work tasks and production output. By capturing data like activity durations, associated components, operator IDs, and production quantities, the app serves as a digital logbook that enhances data accuracy, accessibility, and reporting capabilities.</p>
+    <h4>Future Developments</h4>
+    <ol>
+        <li><strong>Chatbot Integration:</strong> The UI already includes a placeholder for a "ChatBot" screen. The integrated <code>GeminiProService</code> could be used to build a conversational AI that allows users to query their work data in natural language (e.g., "How many 'Component X' did we produce last week?" or "What was the total downtime for 'Machine 5'?").</li>
+        <li><strong>Advanced Reporting and Analytics:</strong> The current reporting is limited to basic PDF/SMS exports. Future versions could include in-app dashboards with charts and graphs visualizing key performance indicators (KPIs) like operator efficiency, machine downtime, and component production rates.</li>
+        <li><strong>Multi-Device Sync and Conflict Resolution:</strong> As mentioned, implementing a true bi-directional sync with conflict resolution would allow managers and operators to use the app on multiple devices (e.g., a personal phone and a shared tablet) seamlessly.</li>
+        <li><strong>User Roles and Permissions:</strong> A more advanced system for user roles could be developed. For example, "Operator" roles might only be able to log activities, while "Manager" roles could access reports, manage components, and view all operator data.</li>
+        <li><strong>Barcode/QR Code Scanning:</strong> To improve efficiency and reduce manual entry errors, a feature could be added to scan barcodes on components or operator badges to automatically populate the relevant fields in the logging screens.</li>
+    </ol>
+</body>
+</html>

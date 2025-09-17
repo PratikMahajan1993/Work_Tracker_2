@@ -31,21 +31,21 @@ class TheBoysRepositoryImpl @Inject constructor(
 
     override suspend fun insertTheBoy(theBoyInfo: TheBoysInfo) {
         val boyToInsert = theBoyInfo.copy(lastModified = System.currentTimeMillis())
-        theBoysInfoDao.insert(boyToInsert)
+        val newId = theBoysInfoDao.insert(boyToInsert) // Capture the new ID
 
         firebaseAuth.currentUser?.uid?.let { userId ->
             repositoryScope.launch {
                 val result = firestoreSyncManager.uploadEntity(
                     userId = userId,
                     collectionName = THE_BOYS_INFO_COLLECTION,
-                    entityId = boyToInsert.boyId.toString(),
-                    data = boyToInsert.toFirestoreData()
+                    entityId = newId.toString(), // Use the new ID for Firestore
+                    data = boyToInsert.copy(boyId = newId.toInt()).toFirestoreData()
                 )
                 if (result.isFailure) {
-                    Log.e(TAG_REPO, "Failed to sync inserted TheBoysInfo '${boyToInsert.boyId}' to Firestore: ${result.exceptionOrNull()?.message}")
+                    Log.e(TAG_REPO, "Failed to sync inserted TheBoysInfo '$newId' to Firestore: ${result.exceptionOrNull()?.message}")
                 }
             }
-        } ?: Log.w(TAG_REPO, "User not logged in, cannot sync inserted TheBoysInfo '${boyToInsert.boyId}'")
+        } ?: Log.w(TAG_REPO, "User not logged in, cannot sync inserted TheBoysInfo '$newId'")
     }
 
     override suspend fun updateTheBoy(theBoyInfo: TheBoysInfo) {

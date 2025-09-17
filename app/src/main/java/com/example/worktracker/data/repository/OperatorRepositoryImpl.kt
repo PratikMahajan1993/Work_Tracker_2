@@ -30,21 +30,21 @@ class OperatorRepositoryImpl @Inject constructor(
 
     override suspend fun insertOperator(operatorInfo: OperatorInfo) {
         val operatorToInsert = operatorInfo.copy(lastModified = System.currentTimeMillis())
-        operatorInfoDao.insert(operatorToInsert)
+        val newId = operatorInfoDao.insert(operatorToInsert) // Capture the new ID
 
         firebaseAuth.currentUser?.uid?.let { userId ->
             repositoryScope.launch {
                 val result = firestoreSyncManager.uploadEntity(
                     userId = userId,
                     collectionName = OPERATOR_INFO_COLLECTION,
-                    entityId = operatorToInsert.operatorId.toString(),
-                    data = operatorToInsert.toFirestoreData()
+                    entityId = newId.toString(), // Use the new ID for Firestore
+                    data = operatorToInsert.copy(operatorId = newId.toInt()).toFirestoreData()
                 )
                 if (result.isFailure) {
-                    Log.e(TAG_REPO, "Failed to sync inserted OperatorInfo ${operatorToInsert.operatorId} to Firestore: ${result.exceptionOrNull()?.message}")
+                    Log.e(TAG_REPO, "Failed to sync inserted OperatorInfo $newId to Firestore: ${result.exceptionOrNull()?.message}")
                 }
             }
-        } ?: Log.w(TAG_REPO, "User not logged in, cannot sync inserted OperatorInfo ${operatorToInsert.operatorId}")
+        } ?: Log.w(TAG_REPO, "User not logged in, cannot sync inserted OperatorInfo $newId")
     }
 
     override suspend fun updateOperator(operatorInfo: OperatorInfo) {

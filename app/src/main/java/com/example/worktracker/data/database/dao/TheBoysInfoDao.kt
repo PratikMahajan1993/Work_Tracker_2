@@ -7,10 +7,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TheBoysInfoDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(theBoyInfo: TheBoysInfo)
+    suspend fun insert(theBoyInfo: TheBoysInfo): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertAllTheBoys(theBoys: List<TheBoysInfo>) // New method for SyncWorker
+    suspend fun upsertAllTheBoys(theBoys: List<TheBoysInfo>)
 
     @Update
     suspend fun update(theBoyInfo: TheBoysInfo)
@@ -23,4 +23,7 @@ interface TheBoysInfoDao {
 
     @Query("SELECT * FROM the_boys_info WHERE boyId = :id")
     suspend fun getTheBoyById(id: Int): TheBoysInfo?
+
+    @Query("DELETE FROM sqlite_sequence WHERE name='the_boys_info'")
+    suspend fun resetAutoIncrement()
 }

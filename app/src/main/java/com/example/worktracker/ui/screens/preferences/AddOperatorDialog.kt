@@ -29,13 +29,12 @@ fun AddOperatorDialog(
     onNextStep: () -> Unit,
     onPreviousStep: () -> Unit,
     onDismiss: () -> Unit,
-    onSave: () -> Unit // Explicit save for the last step if preferred over implicit save via onNextStep
+    onSave: () -> Unit
 ) {
     if (!showDialog) return
 
     val currentStep = uiState.addOperatorStep
     val fieldOrder = listOf(
-        FIELD_OPERATOR_ID,
         FIELD_OPERATOR_NAME,
         FIELD_HOURLY_SALARY,
         FIELD_OPERATOR_ROLE,
@@ -45,8 +44,6 @@ fun AddOperatorDialog(
     )
 
     if (currentStep >= fieldOrder.size) {
-        // This case should ideally not be reached if onNextStep calls onSave on the last step.
-        // Or, it's a dedicated confirmation/summary step if we add one.
         return
     }
 
@@ -55,7 +52,6 @@ fun AddOperatorDialog(
     val currentError = uiState.newOperatorErrors[currentField]
 
     val (label, keyboardType, isOptional) = when (currentField) {
-        FIELD_OPERATOR_ID -> Triple("Operator ID*", KeyboardType.Number, false)
         FIELD_OPERATOR_NAME -> Triple("Operator Name*", KeyboardType.Text, false)
         FIELD_HOURLY_SALARY -> Triple("Hourly Salary*", KeyboardType.Decimal, false)
         FIELD_OPERATOR_ROLE -> Triple("Role*", KeyboardType.Text, false)
@@ -72,7 +68,7 @@ fun AddOperatorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (editingOperator == null) "Add New Operator - Step ${currentStep + 1}/${fieldOrder.size}" else "Edit Operator") },
+        title = { Text("Add New Operator - Step ${currentStep + 1}/${fieldOrder.size}") },
         text = {
             Column {
                 Text("Enter ${label.removeSuffix("*").lowercase()}${if(isOptional) "" else " (required)"}")
@@ -105,7 +101,7 @@ fun AddOperatorDialog(
                 }
                 Button(onClick = {
                     if (currentStep == fieldOrder.size - 1) {
-                        onSave() // Call explicit save on the last step
+                        onSave()
                     } else {
                         onNextStep()
                     }
@@ -115,7 +111,7 @@ fun AddOperatorDialog(
             }
         },
         dismissButton = {
-            if (currentStep == 0) { // Only show Cancel on the first step, otherwise it's handled by Previous/Dismiss
+            if (currentStep == 0) {
                 TextButton(onClick = onDismiss) {
                     Text("Cancel")
                 }
@@ -123,8 +119,3 @@ fun AddOperatorDialog(
         }
     )
 }
-
-// Placeholder for editingOperator, remove if not used
-// This dialog should be for ADDING only. If Edit is needed, it should be a separate dialog.
-// For now, assume this is AddOperatorDialog, and editingOperator is not a concept here.
-private val editingOperator: Any? = null

@@ -1,51 +1,44 @@
 package com.example.worktracker.ui.screens.preferences
 
-import android.content.Context // Added for ApplicationContext
+import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
-import androidx.credentials.CredentialManager // Added for CredentialManager
-import androidx.credentials.exceptions.GetCredentialException // Added for GetCredentialException
+import androidx.credentials.CredentialManager
+import androidx.credentials.exceptions.GetCredentialException
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.asFlow // Required for LiveData.asFlow()
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.worktracker.BuildConfig
-import com.example.worktracker.data.database.AppDatabase // Added import for AppDatabase
+import com.example.worktracker.data.database.AppDatabase
 import com.example.worktracker.data.database.entity.ActivityCategory
 import com.example.worktracker.data.database.entity.OperatorInfo
 import com.example.worktracker.data.database.entity.TheBoysInfo
 import com.example.worktracker.data.repository.ActivityCategoryRepository
 import com.example.worktracker.data.repository.OperatorRepository
 import com.example.worktracker.data.repository.TheBoysRepository
-import com.example.worktracker.data.repository.WorkActivityRepository
+import com.example.worktracker.data.sync.IFirestoreSyncManager
 import com.example.worktracker.di.AppModule.KEY_GEMINI_API_KEY
 import com.example.worktracker.di.AppModule.KEY_MASTER_PASSWORD
 import com.example.worktracker.di.AppModule.KEY_SMS_CONTACT
-import com.example.worktracker.ui.signin.GoogleAuthUiClient // Added for GoogleAuthUiClient
-import com.example.worktracker.ui.signin.SignInErrorType // Added for SignInErrorType
-import com.example.worktracker.ui.signin.UserData // Added for UserData
-import com.example.worktracker.workers.UploadAllDataWorker // Import the new worker
+import com.example.worktracker.ui.signin.GoogleAuthUiClient
+import com.example.worktracker.ui.signin.UserData
+import com.example.worktracker.workers.UploadAllDataWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext // Added for ApplicationContext
-import kotlinx.coroutines.Dispatchers // Added for Dispatchers.IO
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.collect // For collecting the flow
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext // Added for withContext
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 private const val TAG = "PreferencesViewModel"
 private const val UPLOAD_ALL_DATA_WORK_NAME = "uploadAllLocalDataToFirebase"
 
 // Field constants for OperatorInfo
-const val FIELD_OPERATOR_ID = "operatorId"
 const val FIELD_OPERATOR_NAME = "operatorName"
 const val FIELD_HOURLY_SALARY = "hourlySalary"
 const val FIELD_OPERATOR_ROLE = "operatorRole"
@@ -53,22 +46,20 @@ const val FIELD_OPERATOR_PRIORITY = "operatorPriority"
 const val FIELD_OPERATOR_NOTES = "operatorNotes"
 const val FIELD_OPERATOR_NOTES_AI = "operatorNotesAi"
 
-// Field constants for TheBoysInfo (New)
-const val FIELD_BOY_ID = "boyId"
+// Field constants for TheBoysInfo
 const val FIELD_BOY_NAME = "boyName"
 const val FIELD_BOY_ROLE = "boyRole"
 const val FIELD_BOY_NOTES = "boyNotes"
 const val FIELD_BOY_NOTES_AI = "boyNotesAi"
 
 data class PreferencesUiState(
-    // Existing states for password, SMS, Gemini, Master Reset
     val showSetPasswordDialog: Boolean = false,
     val newPasswordInput: String = "",
     val confirmPasswordInput: String = "",
     val newPasswordError: String? = null,
     val confirmPasswordError: String? = null,
     val isPasswordSet: Boolean = false,
-    var snackbarMessage: String? = null, // Made var to allow easy updates
+    var snackbarMessage: String? = null,
     val showMasterResetConfirmationDialog: Boolean = false,
     val masterResetPasswordAttempt: String = "",
     val masterResetPasswordError: String? = null,
@@ -80,43 +71,31 @@ data class PreferencesUiState(
     val geminiApiKeyInput: String = "",
     val geminiApiKeyError: String? = null,
     val isGeminiApiKeySet: Boolean = false,
-
-    // Operator section unlock states
-    val isOperatorSectionUnlocked: Boolean = false, // This will be shared for TheBoys too
-    val showOperatorPasswordDialog: Boolean = false, // Dialog for unlocking Operator section
-    val showTheBoysPasswordDialog: Boolean = false, // Dialog for unlocking TheBoys section (can be same as operator)
+    val isOperatorSectionUnlocked: Boolean = false,
+    val showOperatorPasswordDialog: Boolean = false,
+    val showTheBoysPasswordDialog: Boolean = false,
     val operatorPasswordAttempt: String = "",
     val operatorPasswordError: String? = null,
-
-    // Operator list and its dialog state
     val operators: List<OperatorInfo> = emptyList(),
     val showOperatorListDialog: Boolean = false,
-
-    // States for Editing an existing Operator
     val showEditOperatorDialog: Boolean = false,
     val editingOperator: OperatorInfo? = null,
-    val operatorIdInput: String = "",
     val operatorNameInput: String = "",
     val operatorHourlySalaryInput: String = "",
     val operatorRoleInput: String = "",
     val operatorPriorityInput: String = "",
     val operatorNotesInput: String = "",
     val operatorNotesForAiInput: String = "",
-    val operatorIdError: String? = null,
     val operatorNameError: String? = null,
     val operatorHourlySalaryError: String? = null,
     val operatorRoleError: String? = null,
     val operatorPriorityError: String? = null,
-
-    // States for Adding a new Operator
     val showAddOperatorDialog: Boolean = false,
     val addOperatorStep: Int = 0,
     val newOperatorInputs: Map<String, String> = emptyMap(),
     val newOperatorErrors: Map<String, String?> = emptyMap(),
-
-    // Activity Category Management States
-    val showManageCategoriesDialog: Boolean = false,
     val activityCategories: List<ActivityCategory> = emptyList(),
+    val showManageCategoriesDialog: Boolean = false,
     val showAddCategoryDialog: Boolean = false,
     val newCategoryInput: String = "",
     val newCategoryError: String? = null,
@@ -124,8 +103,6 @@ data class PreferencesUiState(
     val editingCategory: ActivityCategory? = null,
     val editCategoryInput: String = "",
     val editCategoryError: String? = null,
-
-    // States for 'The Boys' Management (New)
     val theBoysList: List<TheBoysInfo> = emptyList(),
     val showTheBoysListDialog: Boolean = false,
     val showAddTheBoyDialog: Boolean = false,
@@ -134,19 +111,15 @@ data class PreferencesUiState(
     val newTheBoyErrors: Map<String, String?> = emptyMap(),
     val showEditTheBoyDialog: Boolean = false,
     val editingTheBoy: TheBoysInfo? = null,
-    val editBoyIdInput: String = "", // Though likely display only in edit dialog
     val editBoyNameInput: String = "",
     val editBoyRoleInput: String = "",
     val editBoyNotesInput: String = "",
     val editBoyNotesForAiInput: String = "",
-    val editBoyIdError: String? = null,
     val editBoyNameError: String? = null,
     val editBoyRoleError: String? = null,
-
-    // Account Management States
     val currentUser: UserData? = null,
     val isAccountActionInProgress: Boolean = false,
-    val isForcePushInProgress: Boolean = false // New state for tracking force push
+    val isForcePushInProgress: Boolean = false
 )
 
 @HiltViewModel
@@ -154,19 +127,18 @@ class PreferencesViewModel @Inject constructor(
     @param:ApplicationContext private val applicationContext: Context,
     private val sharedPreferences: SharedPreferences,
     private val appDatabase: AppDatabase,
-    private val workActivityRepository: WorkActivityRepository,
     private val operatorRepository: OperatorRepository,
     private val activityCategoryRepository: ActivityCategoryRepository,
     private val theBoysRepository: TheBoysRepository,
     private val googleAuthUiClient: GoogleAuthUiClient,
-    private val workManager: WorkManager // Added WorkManager
+    private val workManager: WorkManager,
+    private val firestoreSyncManager: IFirestoreSyncManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PreferencesUiState())
     val uiState: StateFlow<PreferencesUiState> = _uiState.asStateFlow()
 
     private val addOperatorFieldOrder = listOf(
-        FIELD_OPERATOR_ID,
         FIELD_OPERATOR_NAME,
         FIELD_HOURLY_SALARY,
         FIELD_OPERATOR_ROLE,
@@ -176,7 +148,6 @@ class PreferencesViewModel @Inject constructor(
     )
 
     private val addTheBoyFieldOrder = listOf(
-        FIELD_BOY_ID,
         FIELD_BOY_NAME,
         FIELD_BOY_ROLE,
         FIELD_BOY_NOTES,
@@ -191,990 +162,450 @@ class PreferencesViewModel @Inject constructor(
         loadActivityCategories()
         loadTheBoys()
         loadCurrentUser()
-        observeForcePushWorker() // Start observing the worker status
+        observeForcePushWorker()
     }
 
     private fun loadCurrentUser() {
-        _uiState.value = _uiState.value.copy(currentUser = googleAuthUiClient.getSignedInUser())
+        _uiState.update { it.copy(currentUser = googleAuthUiClient.getSignedInUser()) }
     }
 
     fun onForcePushAllLocalDataToFirebase() {
         if (_uiState.value.currentUser == null) {
-            _uiState.value = _uiState.value.copy(snackbarMessage = "You must be signed in to push data.")
+            _uiState.update { it.copy(snackbarMessage = "You must be signed in to push data.") }
             return
         }
         if (_uiState.value.isForcePushInProgress) {
-            _uiState.value = _uiState.value.copy(snackbarMessage = "Data push already in progress.")
+            _uiState.update { it.copy(snackbarMessage = "Data push already in progress.") }
             return
         }
-
-        _uiState.value = _uiState.value.copy(isForcePushInProgress = true, snackbarMessage = "Starting full data push to cloud...")
-
+        _uiState.update { it.copy(isForcePushInProgress = true, snackbarMessage = "Starting full data push to cloud...") }
         val uploadWorkRequest = OneTimeWorkRequestBuilder<UploadAllDataWorker>().build()
-        workManager.enqueueUniqueWork(
-            UPLOAD_ALL_DATA_WORK_NAME,
-            ExistingWorkPolicy.REPLACE, // Or KEEP if you don't want to interrupt an ongoing one
-            uploadWorkRequest
-        )
+        workManager.enqueueUniqueWork(UPLOAD_ALL_DATA_WORK_NAME, ExistingWorkPolicy.REPLACE, uploadWorkRequest)
     }
 
     private fun observeForcePushWorker() {
-        viewModelScope.launch { // Launch a coroutine for collecting the Flow
-            workManager.getWorkInfosForUniqueWorkLiveData(UPLOAD_ALL_DATA_WORK_NAME) // Corrected method name
+        viewModelScope.launch {
+            workManager.getWorkInfosForUniqueWorkLiveData(UPLOAD_ALL_DATA_WORK_NAME)
                 .asFlow()
-                .collect { workInfoList: List<WorkInfo>? -> // Expect a list
-                    val workInfo = workInfoList?.firstOrNull() // Get the first WorkInfo, if available
-                    if (workInfo == null) return@collect
-
-                    when (workInfo.state) {
-                        WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING, WorkInfo.State.BLOCKED -> {
-                            if (!_uiState.value.isForcePushInProgress || _uiState.value.snackbarMessage?.contains("Starting") == true) { 
-                                _uiState.value = _uiState.value.copy(
-                                    isForcePushInProgress = true,
-                                    snackbarMessage = "Pushing data to cloud..."
-                                )
-                            } else {
-                                _uiState.value = _uiState.value.copy(isForcePushInProgress = true) 
-                            }
-                        }
-                        WorkInfo.State.SUCCEEDED -> {
-                            _uiState.value = _uiState.value.copy(
-                                isForcePushInProgress = false,
-                                snackbarMessage = "All local data successfully pushed to cloud."
-                            )
-                        }
-                        WorkInfo.State.FAILED -> {
-                            _uiState.value = _uiState.value.copy(
-                                isForcePushInProgress = false,
-                                snackbarMessage = "Failed to push all local data. Check logs."
-                            )
-                        }
-                        WorkInfo.State.CANCELLED -> {
-                            _uiState.value = _uiState.value.copy(
-                                isForcePushInProgress = false,
-                                snackbarMessage = "Data push cancelled."
-                            )
-                        }
+                .collect { workInfoList ->
+                    val workInfo = workInfoList?.firstOrNull() ?: return@collect
+                    val snackbarMessage = when (workInfo.state) {
+                        WorkInfo.State.SUCCEEDED -> "All local data successfully pushed to cloud."
+                        WorkInfo.State.FAILED -> "Failed to push all local data. Check logs."
+                        WorkInfo.State.CANCELLED -> "Data push cancelled."
+                        else -> null
                     }
+                    val isRunning = workInfo.state == WorkInfo.State.ENQUEUED || workInfo.state == WorkInfo.State.RUNNING
+                    _uiState.update { it.copy(isForcePushInProgress = isRunning, snackbarMessage = snackbarMessage ?: it.snackbarMessage) }
                 }
         }
     }
 
-
     fun onSignInClicked() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isAccountActionInProgress = true, snackbarMessage = null)
+            _uiState.update { it.copy(isAccountActionInProgress = true) }
             try {
                 val signInRequest = googleAuthUiClient.createSignInRequest()
                 val credentialManager = CredentialManager.create(applicationContext)
                 val result = credentialManager.getCredential(applicationContext, signInRequest)
                 val signInResult = googleAuthUiClient.signInWithCredential(result.credential)
-
                 if (signInResult.data != null) {
-                    _uiState.value = _uiState.value.copy(
-                        currentUser = signInResult.data,
-                        snackbarMessage = "Signed in successfully as ${signInResult.data.username ?: "User"}."
-                    )
+                    _uiState.update { it.copy(currentUser = signInResult.data, snackbarMessage = "Signed in as ${signInResult.data.username}") }
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        snackbarMessage = signInResult.errorMessage ?: "Sign-in failed. Please try again."
-                    )
+                    _uiState.update { it.copy(snackbarMessage = signInResult.errorMessage) }
                 }
             } catch (e: GetCredentialException) {
-                _uiState.value = _uiState.value.copy(
-                    snackbarMessage = e.localizedMessage ?: "Sign-in failed. Type: ${e.type}. Please try again."
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    snackbarMessage = e.localizedMessage ?: "An unexpected error occurred. Please try again."
-                )
+                _uiState.update { it.copy(snackbarMessage = e.message) }
             }
-            finally {
-                _uiState.value = _uiState.value.copy(isAccountActionInProgress = false)
-            }
+            _uiState.update { it.copy(isAccountActionInProgress = false) }
         }
     }
 
     fun onSignOutClicked() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isAccountActionInProgress = true, snackbarMessage = null)
-            try {
-                googleAuthUiClient.signOut()
-                _uiState.value = _uiState.value.copy(
-                    currentUser = null,
-                    snackbarMessage = "Signed out successfully."
-                )
-            } catch (e: Exception) {
-                 _uiState.value = _uiState.value.copy(
-                    snackbarMessage = e.localizedMessage ?: "Sign-out failed. Please try again."
-                )
-            }
-            finally {
-                _uiState.value = _uiState.value.copy(isAccountActionInProgress = false)
-            }
+            googleAuthUiClient.signOut()
+            _uiState.update { it.copy(currentUser = null, snackbarMessage = "Signed out") }
         }
     }
 
     private fun loadOperators() {
-        operatorRepository.getAllOperators()
-            .onEach { operatorList ->
-                _uiState.value = _uiState.value.copy(operators = operatorList)
-            }
-            .launchIn(viewModelScope)
+        operatorRepository.getAllOperators().onEach { operators -> _uiState.update { it.copy(operators = operators) } }.launchIn(viewModelScope)
     }
 
     private fun loadActivityCategories() {
-        activityCategoryRepository.getAllCategories()
-            .onEach { categories ->
-                _uiState.value = _uiState.value.copy(activityCategories = categories)
-            }
-            .launchIn(viewModelScope)
+        activityCategoryRepository.getAllCategories().onEach { categories -> _uiState.update { it.copy(activityCategories = categories) } }.launchIn(viewModelScope)
     }
 
     private fun loadTheBoys() {
-        theBoysRepository.getAllTheBoys()
-            .onEach { boysList ->
-                _uiState.value = _uiState.value.copy(theBoysList = boysList)
-            }
-            .launchIn(viewModelScope)
+        theBoysRepository.getAllTheBoys().onEach { boys -> _uiState.update { it.copy(theBoysList = boys) } }.launchIn(viewModelScope)
     }
 
     private fun checkIfPasswordIsSet() {
-        val isSet = sharedPreferences.contains(KEY_MASTER_PASSWORD)
-        _uiState.value = _uiState.value.copy(isPasswordSet = isSet)
+        _uiState.update { it.copy(isPasswordSet = sharedPreferences.contains(KEY_MASTER_PASSWORD)) }
     }
 
     private fun loadSmsContact() {
-        val contact = sharedPreferences.getString(KEY_SMS_CONTACT, null)
-        _uiState.value = _uiState.value.copy(preferredSmsContact = contact)
+        _uiState.update { it.copy(preferredSmsContact = sharedPreferences.getString(KEY_SMS_CONTACT, null)) }
     }
 
     private fun checkIfGeminiApiKeyIsSet() {
-        val isSet = sharedPreferences.contains(KEY_GEMINI_API_KEY)
-        _uiState.value = _uiState.value.copy(isGeminiApiKeySet = isSet)
+        _uiState.update { it.copy(isGeminiApiKeySet = sharedPreferences.contains(KEY_GEMINI_API_KEY)) }
     }
 
     fun clearSnackbarMessage() {
-        _uiState.value = _uiState.value.copy(snackbarMessage = null)
+        _uiState.update { it.copy(snackbarMessage = null) }
     }
 
     fun onShowSetPasswordDialog() {
-        _uiState.value = _uiState.value.copy(
-            showSetPasswordDialog = true,
-            newPasswordInput = "",
-            confirmPasswordInput = "",
-            newPasswordError = null,
-            confirmPasswordError = null
-        )
+        _uiState.update { it.copy(showSetPasswordDialog = true) }
     }
 
     fun onDismissSetPasswordDialog() {
-        _uiState.value = _uiState.value.copy(
-            showSetPasswordDialog = false,
-            newPasswordInput = "",
-            confirmPasswordInput = "",
-            newPasswordError = null,
-            confirmPasswordError = null
-        )
+        _uiState.update { it.copy(showSetPasswordDialog = false) }
     }
 
     fun onNewPasswordInputChange(password: String) {
-        _uiState.value = _uiState.value.copy(newPasswordInput = password)
-        validateSetPasswords()
+        _uiState.update { it.copy(newPasswordInput = password) }
     }
 
     fun onConfirmPasswordInputChange(password: String) {
-        _uiState.value = _uiState.value.copy(confirmPasswordInput = password)
-        validateSetPasswords()
-    }
-
-    private fun validateSetPasswords() {
-        val newPassword = _uiState.value.newPasswordInput
-        val confirmPassword = _uiState.value.confirmPasswordInput
-        var newPasswordError: String? = null
-        var confirmPasswordError: String? = null
-
-        if (newPassword.isNotBlank() && newPassword.length < 6) {
-            newPasswordError = "Password must be at least 6 characters long."
-        }
-        if (confirmPassword.isNotBlank() && newPassword != confirmPassword) {
-            confirmPasswordError = "Passwords do not match."
-        }
-
-        _uiState.value = _uiState.value.copy(
-            newPasswordError = newPasswordError,
-            confirmPasswordError = confirmPasswordError
-        )
+        _uiState.update { it.copy(confirmPasswordInput = password) }
     }
 
     fun onSavePasswordAttempt() {
-        validateSetPasswords()
-        val currentState = _uiState.value
-        if (currentState.newPasswordInput.isNotBlank() && currentState.newPasswordError == null && currentState.confirmPasswordError == null) {
-            sharedPreferences.edit().putString(KEY_MASTER_PASSWORD, currentState.newPasswordInput).apply()
-            _uiState.value = currentState.copy(
-                showSetPasswordDialog = false,
-                newPasswordInput = "",
-                confirmPasswordInput = "",
-                newPasswordError = null,
-                confirmPasswordError = null,
-                isPasswordSet = true,
-                snackbarMessage = "Master reset password set successfully."
-            )
-        } else if (currentState.newPasswordInput.isBlank()) {
-            _uiState.value = _uiState.value.copy(
-                newPasswordError = "Password cannot be empty.",
-                confirmPasswordError = null
-            )
+        val state = _uiState.value
+        if (state.newPasswordInput.length >= 6 && state.newPasswordInput == state.confirmPasswordInput) {
+            sharedPreferences.edit().putString(KEY_MASTER_PASSWORD, state.newPasswordInput).apply()
+            _uiState.update { it.copy(showSetPasswordDialog = false, isPasswordSet = true, snackbarMessage = "Password set") }
+        } else {
+            _uiState.update { it.copy(newPasswordError = "Passwords must match and be at least 6 characters.", confirmPasswordError = "Passwords must match and be at least 6 characters.") }
         }
     }
 
     fun onMasterResetClicked() {
-        if (_uiState.value.isPasswordSet) {
-            _uiState.value = _uiState.value.copy(
-                showMasterResetConfirmationDialog = true,
-                masterResetPasswordAttempt = "",
-                masterResetPasswordError = null
-            )
-        } else {
-            _uiState.value = _uiState.value.copy(snackbarMessage = "Please set a master reset password first.")
-        }
+        _uiState.update { it.copy(showMasterResetConfirmationDialog = true) }
     }
 
     fun onDismissMasterResetConfirmationDialog() {
-        _uiState.value = _uiState.value.copy(
-            showMasterResetConfirmationDialog = false,
-            masterResetPasswordAttempt = "",
-            masterResetPasswordError = null
-        )
+        _uiState.update { it.copy(showMasterResetConfirmationDialog = false) }
     }
 
     fun onMasterResetPasswordAttemptChange(password: String) {
-        _uiState.value = _uiState.value.copy(masterResetPasswordAttempt = password, masterResetPasswordError = null)
+        _uiState.update { it.copy(masterResetPasswordAttempt = password) }
     }
 
     fun onConfirmMasterReset() {
         val attempt = _uiState.value.masterResetPasswordAttempt
         val storedPassword = sharedPreferences.getString(KEY_MASTER_PASSWORD, null)
+        val userId = _uiState.value.currentUser?.userId
 
         if (storedPassword != null && attempt == storedPassword) {
             viewModelScope.launch {
                 try {
-                    withContext(Dispatchers.IO) {
-                        appDatabase.clearAllTables() // Wipe Room DB
-                        sharedPreferences.edit().clear().apply() // Wipe SharedPreferences
-                        googleAuthUiClient.signOut() // Explicitly sign out
+                    if (userId != null) {
+                        firestoreSyncManager.deleteAllUserData(userId)
                     }
-
-                    // Reset relevant UI states immediately after background tasks complete
-                    _uiState.value = _uiState.value.copy(
-                        masterResetPasswordError = null, // Clear previous error if any
-                        snackbarMessage = "All application data and settings have been wiped.",
-                        isOperatorSectionUnlocked = false,
-                        isPasswordSet = false,
-                        preferredSmsContact = null,
-                        isGeminiApiKeySet = false,
-                        operators = emptyList(),
-                        activityCategories = emptyList(),
-                        theBoysList = emptyList(),
-                        currentUser = null
-                    )
-
-                    // Re-initialize necessary states from (now empty) data sources
-                    checkIfPasswordIsSet()
-                    loadSmsContact()
-                    checkIfGeminiApiKeyIsSet() // Corrected method call
-                    loadOperators()
-                    loadActivityCategories()
-                    loadTheBoys()
-                    loadCurrentUser()
-
+                    withContext(Dispatchers.IO) {
+                        appDatabase.clearAllTables()
+                        appDatabase.theBoysInfoDao().resetAutoIncrement()
+                        appDatabase.operatorInfoDao().resetAutoIncrement()
+                        sharedPreferences.edit().clear().apply()
+                        googleAuthUiClient.signOut()
+                    }
+                    _uiState.value = PreferencesUiState(snackbarMessage = "All application data and settings have been wiped.")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error during master reset: ", e)
-                    _uiState.value = _uiState.value.copy(
-                        masterResetPasswordError = null, // Clear password attempt error
-                        snackbarMessage = "Error during master reset: ${e.localizedMessage}"
-                    )
+                    _uiState.update { it.copy(snackbarMessage = "Error during master reset: ${e.localizedMessage}") }
                 } finally {
-                    // Ensure dialog is dismissed regardless of outcome
-                    _uiState.value = _uiState.value.copy(
-                        showMasterResetConfirmationDialog = false,
-                        masterResetPasswordAttempt = "" // Clear password attempt
-                    )
+                    _uiState.update { it.copy(showMasterResetConfirmationDialog = false, masterResetPasswordAttempt = "") }
                 }
             }
         } else {
-            _uiState.value = _uiState.value.copy(masterResetPasswordError = "Incorrect password.")
+            _uiState.update { it.copy(masterResetPasswordError = "Incorrect password.") }
         }
     }
 
     fun onShowSmsContactDialog() {
-        val currentContact = _uiState.value.preferredSmsContact ?: ""
-        _uiState.value = _uiState.value.copy(
-            showSmsContactDialog = true,
-            smsContactInput = currentContact,
-            smsContactError = null
-        )
+        _uiState.update { it.copy(showSmsContactDialog = true) }
     }
 
     fun onDismissSmsContactDialog() {
-        _uiState.value = _uiState.value.copy(
-            showSmsContactDialog = false,
-            smsContactInput = "",
-            smsContactError = null
-        )
+        _uiState.update { it.copy(showSmsContactDialog = false) }
     }
 
     fun onSmsContactInputChange(contact: String) {
-        _uiState.value = _uiState.value.copy(smsContactInput = contact, smsContactError = null)
+        _uiState.update { it.copy(smsContactInput = contact) }
     }
 
     fun onSaveSmsContact() {
-        val contact = _uiState.value.smsContactInput
-        if (contact.isNotBlank()) {
-            sharedPreferences.edit().putString(KEY_SMS_CONTACT, contact).apply()
-            _uiState.value = _uiState.value.copy(
-                preferredSmsContact = contact,
-                showSmsContactDialog = false,
-                smsContactInput = "",
-                smsContactError = null,
-                snackbarMessage = "Preferred SMS contact saved."
-            )
-        } else {
-            _uiState.value = _uiState.value.copy(smsContactError = "Contact cannot be empty.")
-        }
+        sharedPreferences.edit().putString(KEY_SMS_CONTACT, _uiState.value.smsContactInput).apply()
+        _uiState.update { it.copy(showSmsContactDialog = false, preferredSmsContact = _uiState.value.smsContactInput) }
     }
 
     fun onShowSetGeminiApiKeyDialog() {
-        val currentApiKey = sharedPreferences.getString(KEY_GEMINI_API_KEY, "") ?: ""
-        _uiState.value = _uiState.value.copy(
-            showSetGeminiApiKeyDialog = true,
-            geminiApiKeyInput = currentApiKey,
-            geminiApiKeyError = null
-        )
+        _uiState.update { it.copy(showSetGeminiApiKeyDialog = true) }
     }
 
     fun onDismissSetGeminiApiKeyDialog() {
-        _uiState.value = _uiState.value.copy(
-            showSetGeminiApiKeyDialog = false,
-            geminiApiKeyInput = "",
-            geminiApiKeyError = null
-        )
+        _uiState.update { it.copy(showSetGeminiApiKeyDialog = false) }
     }
 
     fun onGeminiApiKeyInputChange(apiKey: String) {
-        _uiState.value = _uiState.value.copy(geminiApiKeyInput = apiKey, geminiApiKeyError = null)
+        _uiState.update { it.copy(geminiApiKeyInput = apiKey) }
     }
 
     fun onSaveGeminiApiKey() {
-        val apiKey = _uiState.value.geminiApiKeyInput
-        if (apiKey.isNotBlank()) {
-            sharedPreferences.edit().putString(KEY_GEMINI_API_KEY, apiKey).apply()
-            _uiState.value = _uiState.value.copy(
-                isGeminiApiKeySet = true,
-                showSetGeminiApiKeyDialog = false,
-                geminiApiKeyInput = "",
-                geminiApiKeyError = null,
-                snackbarMessage = "Gemini API Key saved successfully."
-            )
-        } else {
-            _uiState.value = _uiState.value.copy(geminiApiKeyError = "API Key cannot be empty.")
-        }
+        sharedPreferences.edit().putString(KEY_GEMINI_API_KEY, _uiState.value.geminiApiKeyInput).apply()
+        _uiState.update { it.copy(showSetGeminiApiKeyDialog = false, isGeminiApiKeySet = true) }
     }
 
     fun onOperatorSectionClicked() {
-        if (!_uiState.value.isOperatorSectionUnlocked) {
-            _uiState.value = _uiState.value.copy(
-                showOperatorPasswordDialog = true,
-                showTheBoysPasswordDialog = false,
-                operatorPasswordAttempt = "",
-                operatorPasswordError = null
-            )
+        if (_uiState.value.isOperatorSectionUnlocked) {
+            _uiState.update { it.copy(showOperatorListDialog = true) }
         } else {
-            _uiState.value = _uiState.value.copy(showOperatorListDialog = true)
+            _uiState.update { it.copy(showOperatorPasswordDialog = true) }
         }
     }
 
     fun onDismissOperatorPasswordDialog() {
-        _uiState.value = _uiState.value.copy(
-            showOperatorPasswordDialog = false,
-            operatorPasswordAttempt = "",
-            operatorPasswordError = null
-        )
-    }
-
-    fun onDismissOperatorListDialog() {
-        _uiState.value = _uiState.value.copy(showOperatorListDialog = false)
+        _uiState.update { it.copy(showOperatorPasswordDialog = false, showTheBoysPasswordDialog = false) }
     }
 
     fun onOperatorPasswordAttemptChange(password: String) {
-        _uiState.value = _uiState.value.copy(operatorPasswordAttempt = password, operatorPasswordError = null)
+        _uiState.update { it.copy(operatorPasswordAttempt = password) }
     }
 
     fun onUnlockSectionAttempt() {
-        val attempt = _uiState.value.operatorPasswordAttempt
-        if (attempt == BuildConfig.OPERATOR_INFO_PASSWORD) {
-            val wasOperatorDialog = _uiState.value.showOperatorPasswordDialog
-            _uiState.value = _uiState.value.copy(
-                isOperatorSectionUnlocked = true,
-                showOperatorPasswordDialog = false,
-                showTheBoysPasswordDialog = false,
-                showOperatorListDialog = wasOperatorDialog,
-                showTheBoysListDialog = !wasOperatorDialog,
-                operatorPasswordAttempt = "",
-                operatorPasswordError = null,
-                snackbarMessage = "Section unlocked."
-            )
+        if (_uiState.value.operatorPasswordAttempt == BuildConfig.OPERATOR_INFO_PASSWORD) {
+            _uiState.update { it.copy(isOperatorSectionUnlocked = true, showOperatorPasswordDialog = false, showTheBoysPasswordDialog = false) }
         } else {
-            _uiState.value = _uiState.value.copy(operatorPasswordError = "Incorrect password.")
+            _uiState.update { it.copy(operatorPasswordError = "Incorrect password.") }
         }
     }
 
-    fun onEditOperatorClicked(operatorInfo: OperatorInfo) {
-        _uiState.value = _uiState.value.copy(
-            showEditOperatorDialog = true,
-            showAddOperatorDialog = false,
-            editingOperator = operatorInfo,
-            operatorIdInput = operatorInfo.operatorId.toString(),
-            operatorNameInput = operatorInfo.name,
-            operatorHourlySalaryInput = operatorInfo.hourlySalary.toString(),
-            operatorRoleInput = operatorInfo.role,
-            operatorPriorityInput = operatorInfo.priority.toString(),
-            operatorNotesInput = operatorInfo.notes ?: "",
-            operatorNotesForAiInput = operatorInfo.notesForAi ?: "",
-            operatorIdError = null,
-            operatorNameError = null,
-            operatorHourlySalaryError = null,
-            operatorRoleError = null,
-            operatorPriorityError = null
-        )
-    }
-
-    fun onDismissEditOperatorDialog() {
-        _uiState.value = _uiState.value.copy(
-            showEditOperatorDialog = false,
-            editingOperator = null,
-            operatorIdInput = "", operatorNameInput = "", operatorHourlySalaryInput = "",
-            operatorRoleInput = "", operatorPriorityInput = "", operatorNotesInput = "",
-            operatorNotesForAiInput = "", operatorIdError = null, operatorNameError = null,
-            operatorHourlySalaryError = null, operatorRoleError = null, operatorPriorityError = null
-        )
-    }
-
-    fun onOperatorNameChange(name: String) { _uiState.value = _uiState.value.copy(operatorNameInput = name, operatorNameError = null) }
-    fun onOperatorHourlySalaryChange(salary: String) { _uiState.value = _uiState.value.copy(operatorHourlySalaryInput = salary, operatorHourlySalaryError = null) }
-    fun onOperatorRoleChange(role: String) { _uiState.value = _uiState.value.copy(operatorRoleInput = role, operatorRoleError = null) }
-    fun onOperatorPriorityChange(priority: String) { _uiState.value = _uiState.value.copy(operatorPriorityInput = priority, operatorPriorityError = null) }
-    fun onOperatorNotesChange(notes: String) { _uiState.value = _uiState.value.copy(operatorNotesInput = notes) }
-    fun onOperatorNotesForAiChange(notes: String) { _uiState.value = _uiState.value.copy(operatorNotesForAiInput = notes) }
-
-    fun onSaveEditOperator() {
-        val state = _uiState.value
-        val editingOp = state.editingOperator ?: return
-
-        val name = state.operatorNameInput
-        val salaryStr = state.operatorHourlySalaryInput
-        val role = state.operatorRoleInput
-        val priorityStr = state.operatorPriorityInput
-
-        var nameError: String? = null
-        var salaryError: String? = null
-        var roleError: String? = null
-        var priorityError: String? = null
-
-        val salary = salaryStr.toDoubleOrNull()
-        val priority = priorityStr.toIntOrNull()
-
-        if (name.isBlank()) nameError = "Name cannot be empty."
-        if (salary == null) salaryError = "Salary must be a valid number."
-        if (role.isBlank()) roleError = "Role cannot be empty."
-        if (priority == null || priority !in 1..5) priorityError = "Priority must be a number between 1-5."
-
-        if (nameError != null || salaryError != null || roleError != null || priorityError != null) {
-            _uiState.value = state.copy(
-                operatorNameError = nameError,
-                operatorHourlySalaryError = salaryError,
-                operatorRoleError = roleError,
-                operatorPriorityError = priorityError
-            )
-            return
-        }
-
-        val operatorToSave = editingOp.copy(
-            name = name,
-            hourlySalary = salary!!,
-            role = role,
-            priority = priority!!,
-            notes = state.operatorNotesInput.takeIf { it.isNotBlank() },
-            notesForAi = state.operatorNotesForAiInput.takeIf { it.isNotBlank() }
-        )
-
-        viewModelScope.launch {
-            operatorRepository.updateOperator(operatorToSave)
-            _uiState.value = _uiState.value.copy(
-                showEditOperatorDialog = false,
-                snackbarMessage = "Operator updated successfully.",
-                editingOperator = null
-            )
-        }
+    fun onDismissOperatorListDialog() {
+        _uiState.update { it.copy(showOperatorListDialog = false) }
     }
 
     fun onAddNewOperatorClicked() {
-        _uiState.value = _uiState.value.copy(
-            showAddOperatorDialog = true,
-            showEditOperatorDialog = false,
-            addOperatorStep = 0,
-            newOperatorInputs = emptyMap(),
-            newOperatorErrors = emptyMap()
-        )
+        _uiState.update { it.copy(showAddOperatorDialog = true, addOperatorStep = 0, newOperatorInputs = emptyMap(), newOperatorErrors = emptyMap()) }
     }
 
     fun onDismissAddOperatorDialog() {
-        _uiState.value = _uiState.value.copy(
-            showAddOperatorDialog = false,
-            addOperatorStep = 0,
-            newOperatorInputs = emptyMap(),
-            newOperatorErrors = emptyMap()
-        )
+        _uiState.update { it.copy(showAddOperatorDialog = false) }
     }
-
+    
     fun onNewOperatorInputChange(fieldName: String, value: String) {
-        val currentInputs = _uiState.value.newOperatorInputs.toMutableMap()
-        currentInputs[fieldName] = value
-        val currentErrors = _uiState.value.newOperatorErrors.toMutableMap()
-        currentErrors[fieldName] = null
-        _uiState.value = _uiState.value.copy(newOperatorInputs = currentInputs, newOperatorErrors = currentErrors)
-    }
-
-    private fun validateCurrentAddOperatorStep(): Boolean {
-        val state = _uiState.value
-        val currentStep = state.addOperatorStep
-        if (currentStep >= addOperatorFieldOrder.size) return true
-
-        val fieldName = addOperatorFieldOrder[currentStep]
-        val value = state.newOperatorInputs[fieldName] ?: ""
-        var error: String? = null
-
-        when (fieldName) {
-            FIELD_OPERATOR_ID -> {
-                val id = value.toIntOrNull()
-                if (id == null) error = "ID must be a number."
-                else if (state.operators.any { it.operatorId == id }) error = "This ID is already in use."
-            }
-            FIELD_OPERATOR_NAME -> if (value.isBlank()) error = "Name cannot be empty."
-            FIELD_HOURLY_SALARY -> if (value.toDoubleOrNull() == null) error = "Salary must be a valid number."
-            FIELD_OPERATOR_ROLE -> if (value.isBlank()) error = "Role cannot be empty."
-            FIELD_OPERATOR_PRIORITY -> {
-                val priorityNum = value.toIntOrNull()
-                if (priorityNum == null || priorityNum !in 1..5) error = "Priority must be a number between 1-5."
-            }
-        }
-
-        if (error != null) {
-            val currentErrors = state.newOperatorErrors.toMutableMap()
-            currentErrors[fieldName] = error
-            _uiState.value = state.copy(newOperatorErrors = currentErrors)
-            return false
-        }
-        return true
+        _uiState.update { it.copy(newOperatorInputs = _uiState.value.newOperatorInputs + (fieldName to value)) }
     }
 
     fun onAddOperatorNextStep() {
-        if (validateCurrentAddOperatorStep()) {
-            val currentStep = _uiState.value.addOperatorStep
-            if (currentStep < addOperatorFieldOrder.size - 1) {
-                _uiState.value = _uiState.value.copy(addOperatorStep = currentStep + 1)
-            } else {
-                onSaveNewOperator()
-            }
-        }
+        _uiState.update { it.copy(addOperatorStep = _uiState.value.addOperatorStep + 1) }
     }
 
     fun onAddOperatorPreviousStep() {
-        val currentStep = _uiState.value.addOperatorStep
-        if (currentStep > 0) {
-            _uiState.value = _uiState.value.copy(addOperatorStep = currentStep - 1)
-        }
+        _uiState.update { it.copy(addOperatorStep = _uiState.value.addOperatorStep - 1) }
     }
-
+    
     fun onSaveNewOperator() {
-        var allFieldsValid = true
-        val tempErrors = mutableMapOf<String, String?>()
         val inputs = _uiState.value.newOperatorInputs
-
-        val idStr = inputs[FIELD_OPERATOR_ID] ?: ""
-        val id = idStr.toIntOrNull()
-        if (id == null) { tempErrors[FIELD_OPERATOR_ID] = "ID must be a number."; allFieldsValid = false }
-        else if (_uiState.value.operators.any { it.operatorId == id }) { tempErrors[FIELD_OPERATOR_ID] = "This ID is already in use."; allFieldsValid = false }
-
-        val name = inputs[FIELD_OPERATOR_NAME] ?: ""
-        if (name.isBlank()) { tempErrors[FIELD_OPERATOR_NAME] = "Name cannot be empty."; allFieldsValid = false }
-
-        val salaryStr = inputs[FIELD_HOURLY_SALARY] ?: ""
-        val salary = salaryStr.toDoubleOrNull()
-        if (salary == null) { tempErrors[FIELD_HOURLY_SALARY] = "Salary must be a valid number."; allFieldsValid = false }
-
-        val role = inputs[FIELD_OPERATOR_ROLE] ?: ""
-        if (role.isBlank()) { tempErrors[FIELD_OPERATOR_ROLE] = "Role cannot be empty."; allFieldsValid = false }
-
-        val priorityStr = inputs[FIELD_OPERATOR_PRIORITY] ?: ""
-        val priority = priorityStr.toIntOrNull()
-        if (priority == null || priority !in 1..5) { tempErrors[FIELD_OPERATOR_PRIORITY] = "Priority must be a number between 1-5."; allFieldsValid = false }
-
-        if (!allFieldsValid) {
-            val currentErrors = _uiState.value.newOperatorErrors.toMutableMap()
-            tempErrors.forEach { (key, value) -> if (value != null) currentErrors[key] = value }
-            _uiState.value = _uiState.value.copy(newOperatorErrors = currentErrors)
-            return
-        }
-
-        val operatorToSave = OperatorInfo(
-            operatorId = id!!,
-            name = name,
-            hourlySalary = salary!!,
-            role = role,
-            priority = priority!!,
-            notes = inputs[FIELD_OPERATOR_NOTES]?.takeIf { it.isNotBlank() },
-            notesForAi = inputs[FIELD_OPERATOR_NOTES_AI]?.takeIf { it.isNotBlank() }
+        val operator = OperatorInfo(
+            name = inputs[FIELD_OPERATOR_NAME]!!,
+            hourlySalary = inputs[FIELD_HOURLY_SALARY]!!.toDouble(),
+            role = inputs[FIELD_OPERATOR_ROLE]!!,
+            priority = inputs[FIELD_OPERATOR_PRIORITY]!!.toInt(),
+            notes = inputs[FIELD_OPERATOR_NOTES],
+            notesForAi = inputs[FIELD_OPERATOR_NOTES_AI]
         )
-
         viewModelScope.launch {
-            operatorRepository.insertOperator(operatorToSave)
-            _uiState.value = _uiState.value.copy(
-                showAddOperatorDialog = false,
-                snackbarMessage = "Operator added successfully.",
-                addOperatorStep = 0,
-                newOperatorInputs = emptyMap(),
-                newOperatorErrors = emptyMap()
-            )
+            operatorRepository.insertOperator(operator)
+            _uiState.update { it.copy(showAddOperatorDialog = false, newOperatorInputs = emptyMap(), addOperatorStep = 0) }
         }
     }
-
-    fun onDeleteOperator(operatorInfo: OperatorInfo) {
-        viewModelScope.launch {
-            operatorRepository.deleteOperator(operatorInfo)
-            _uiState.value = _uiState.value.copy(snackbarMessage = "Operator deleted.")
-        }
+    
+    fun onEditOperatorClicked(operator: OperatorInfo) {
+        _uiState.update { it.copy(
+            editingOperator = operator, 
+            showEditOperatorDialog = true,
+            operatorNameInput = operator.name,
+            operatorHourlySalaryInput = operator.hourlySalary.toString(),
+            operatorRoleInput = operator.role,
+            operatorPriorityInput = operator.priority.toString(),
+            operatorNotesInput = operator.notes ?: "",
+            operatorNotesForAiInput = operator.notesForAi ?: ""
+        )}
     }
 
+    fun onDismissEditOperatorDialog() {
+        _uiState.update { it.copy(showEditOperatorDialog = false) }
+    }
+
+    fun onOperatorNameChange(name: String) { _uiState.update { it.copy(operatorNameInput = name) } }
+    fun onOperatorHourlySalaryChange(salary: String) { _uiState.update { it.copy(operatorHourlySalaryInput = salary) } }
+    fun onOperatorRoleChange(role: String) { _uiState.update { it.copy(operatorRoleInput = role) } }
+    fun onOperatorPriorityChange(priority: String) { _uiState.update { it.copy(operatorPriorityInput = priority) } }
+    fun onOperatorNotesChange(notes: String) { _uiState.update { it.copy(operatorNotesInput = notes) } }
+    fun onOperatorNotesForAiChange(notesForAi: String) { _uiState.update { it.copy(operatorNotesForAiInput = notesForAi) } }
+
+    fun onSaveEditOperator() {
+        val state = _uiState.value
+        val operator = state.editingOperator!!.copy(
+            name = state.operatorNameInput,
+            hourlySalary = state.operatorHourlySalaryInput.toDouble(),
+            role = state.operatorRoleInput,
+            priority = state.operatorPriorityInput.toInt(),
+            notes = state.operatorNotesInput,
+            notesForAi = state.operatorNotesForAiInput
+        )
+        viewModelScope.launch {
+            operatorRepository.updateOperator(operator)
+            _uiState.update { it.copy(showEditOperatorDialog = false) }
+        }
+    }
+    
+    fun onDeleteOperator(operator: OperatorInfo) {
+        viewModelScope.launch {
+            operatorRepository.deleteOperator(operator)
+        }
+    }
+    
     fun onTheBoysSectionClicked() {
-        if (!_uiState.value.isOperatorSectionUnlocked) {
-            _uiState.value = _uiState.value.copy(
-                showTheBoysPasswordDialog = true,
-                showOperatorPasswordDialog = false,
-                operatorPasswordAttempt = "",
-                operatorPasswordError = null
-            )
+        if (_uiState.value.isOperatorSectionUnlocked) {
+            _uiState.update { it.copy(showTheBoysListDialog = true) }
         } else {
-            _uiState.value = _uiState.value.copy(showTheBoysListDialog = true)
+            _uiState.update { it.copy(showTheBoysPasswordDialog = true) }
         }
     }
 
     fun onDismissTheBoysListDialog() {
-        _uiState.value = _uiState.value.copy(showTheBoysListDialog = false)
+        _uiState.update { it.copy(showTheBoysListDialog = false) }
     }
-
+    
     fun onAddNewTheBoyClicked() {
-        _uiState.value = _uiState.value.copy(
-            showAddTheBoyDialog = true,
-            showEditTheBoyDialog = false,
-            addTheBoyStep = 0,
-            newTheBoyInputs = emptyMap(),
-            newTheBoyErrors = emptyMap()
-        )
+        _uiState.update { it.copy(showAddTheBoyDialog = true, addTheBoyStep = 0, newTheBoyInputs = emptyMap(), newTheBoyErrors = emptyMap()) }
     }
-
+    
     fun onDismissAddTheBoyDialog() {
-        _uiState.value = _uiState.value.copy(
-            showAddTheBoyDialog = false,
-            addTheBoyStep = 0,
-            newTheBoyInputs = emptyMap(),
-            newTheBoyErrors = emptyMap()
-        )
+        _uiState.update { it.copy(showAddTheBoyDialog = false) }
     }
 
     fun onNewTheBoyInputChange(fieldName: String, value: String) {
-        val currentInputs = _uiState.value.newTheBoyInputs.toMutableMap()
-        currentInputs[fieldName] = value
-        val currentErrors = _uiState.value.newTheBoyErrors.toMutableMap()
-        currentErrors[fieldName] = null
-        _uiState.value = _uiState.value.copy(newTheBoyInputs = currentInputs, newTheBoyErrors = currentErrors)
-    }
-
-    private fun validateCurrentAddTheBoyStep(): Boolean {
-        val state = _uiState.value
-        val currentStep = state.addTheBoyStep
-        if (currentStep >= addTheBoyFieldOrder.size) return true
-
-        val fieldName = addTheBoyFieldOrder[currentStep]
-        val value = state.newTheBoyInputs[fieldName] ?: ""
-        var error: String? = null
-
-        when (fieldName) {
-            FIELD_BOY_ID -> {
-                val id = value.toIntOrNull()
-                if (id == null) error = "ID must be a number."
-                else if (state.theBoysList.any { it.boyId == id }) error = "This ID is already in use."
-            }
-            FIELD_BOY_NAME -> if (value.isBlank()) error = "Name cannot be empty."
-            FIELD_BOY_ROLE -> if (value.isBlank()) error = "Role cannot be empty."
-        }
-
-        if (error != null) {
-            val currentErrors = state.newTheBoyErrors.toMutableMap()
-            currentErrors[fieldName] = error
-            _uiState.value = state.copy(newTheBoyErrors = currentErrors)
-            return false
-        }
-        return true
+        _uiState.update { it.copy(newTheBoyInputs = _uiState.value.newTheBoyInputs + (fieldName to value)) }
     }
 
     fun onAddTheBoyNextStep() {
-        if (validateCurrentAddTheBoyStep()) {
-            val currentStep = _uiState.value.addTheBoyStep
-            if (currentStep < addTheBoyFieldOrder.size - 1) {
-                _uiState.value = _uiState.value.copy(addTheBoyStep = currentStep + 1)
-            } else {
-                onSaveNewTheBoy() // Auto-save on last step if valid
-            }
-        }
+        _uiState.update { it.copy(addTheBoyStep = _uiState.value.addTheBoyStep + 1) }
     }
 
     fun onAddTheBoyPreviousStep() {
-        val currentStep = _uiState.value.addTheBoyStep
-        if (currentStep > 0) {
-            _uiState.value = _uiState.value.copy(addTheBoyStep = currentStep - 1)
-        }
+        _uiState.update { it.copy(addTheBoyStep = _uiState.value.addTheBoyStep - 1) }
     }
-
+    
     fun onSaveNewTheBoy() {
-        var allFieldsValid = true
-        val tempErrors = mutableMapOf<String, String?>()
         val inputs = _uiState.value.newTheBoyInputs
-
-        val idStr = inputs[FIELD_BOY_ID] ?: ""
-        val id = idStr.toIntOrNull()
-        if (id == null) { tempErrors[FIELD_BOY_ID] = "ID must be a number."; allFieldsValid = false }
-        else if (_uiState.value.theBoysList.any { it.boyId == id }) { tempErrors[FIELD_BOY_ID] = "This ID is already in use."; allFieldsValid = false }
-
-        val name = inputs[FIELD_BOY_NAME] ?: ""
-        if (name.isBlank()) { tempErrors[FIELD_BOY_NAME] = "Name cannot be empty."; allFieldsValid = false }
-
-        val role = inputs[FIELD_BOY_ROLE] ?: ""
-        if (role.isBlank()) { tempErrors[FIELD_BOY_ROLE] = "Role cannot be empty."; allFieldsValid = false }
-
-        if (!allFieldsValid) {
-            val currentErrors = _uiState.value.newTheBoyErrors.toMutableMap()
-            tempErrors.forEach { (key, value) -> if (value != null) currentErrors[key] = value }
-            _uiState.value = _uiState.value.copy(newTheBoyErrors = currentErrors)
-            return
-        }
-
-        val boyToSave = TheBoysInfo(
-            boyId = id!!,
-            name = name,
-            role = role,
-            notes = inputs[FIELD_BOY_NOTES]?.takeIf { it.isNotBlank() },
-            notesForAi = inputs[FIELD_BOY_NOTES_AI]?.takeIf { it.isNotBlank() }
+        val boy = TheBoysInfo(
+            name = inputs[FIELD_BOY_NAME]!!,
+            role = inputs[FIELD_BOY_ROLE]!!,
+            notes = inputs[FIELD_BOY_NOTES],
+            notesForAi = inputs[FIELD_BOY_NOTES_AI]
         )
-
         viewModelScope.launch {
-            theBoysRepository.insertTheBoy(boyToSave)
-            _uiState.value = _uiState.value.copy(
-                showAddTheBoyDialog = false,
-                snackbarMessage = "'Boy' added successfully.",
-                addTheBoyStep = 0,
-                newTheBoyInputs = emptyMap(),
-                newTheBoyErrors = emptyMap()
-            )
+            theBoysRepository.insertTheBoy(boy)
+            _uiState.update { it.copy(showAddTheBoyDialog = false, newTheBoyInputs = emptyMap(), addTheBoyStep = 0) }
         }
     }
 
-    fun onEditTheBoyClicked(theBoy: TheBoysInfo) {
-        _uiState.value = _uiState.value.copy(
+    fun onEditTheBoyClicked(boy: TheBoysInfo) {
+        _uiState.update { it.copy(
+            editingTheBoy = boy, 
             showEditTheBoyDialog = true,
-            editingTheBoy = theBoy,
-            editBoyIdInput = theBoy.boyId.toString(),
-            editBoyNameInput = theBoy.name,
-            editBoyRoleInput = theBoy.role,
-            editBoyNotesInput = theBoy.notes ?: "",
-            editBoyNotesForAiInput = theBoy.notesForAi ?: "",
-            editBoyIdError = null,
-            editBoyNameError = null,
-            editBoyRoleError = null
-        )
+            editBoyNameInput = boy.name,
+            editBoyRoleInput = boy.role,
+            editBoyNotesInput = boy.notes ?: "",
+            editBoyNotesForAiInput = boy.notesForAi ?: ""
+        )}
     }
 
     fun onDismissEditTheBoyDialog() {
-        _uiState.value = _uiState.value.copy(
-            showEditTheBoyDialog = false,
-            editingTheBoy = null,
-            editBoyIdInput = "",
-            editBoyNameInput = "",
-            editBoyRoleInput = "",
-            editBoyNotesInput = "",
-            editBoyNotesForAiInput = "",
-            editBoyIdError = null,
-            editBoyNameError = null,
-            editBoyRoleError = null
-        )
+        _uiState.update { it.copy(showEditTheBoyDialog = false) }
     }
 
-    fun onEditBoyNameChange(name: String) { _uiState.value = _uiState.value.copy(editBoyNameInput = name, editBoyNameError = null) }
-    fun onEditBoyRoleChange(role: String) { _uiState.value = _uiState.value.copy(editBoyRoleInput = role, editBoyRoleError = null) }
-    fun onEditBoyNotesChange(notes: String) { _uiState.value = _uiState.value.copy(editBoyNotesInput = notes) }
-    fun onEditBoyNotesForAiChange(notes: String) { _uiState.value = _uiState.value.copy(editBoyNotesForAiInput = notes) }
-
+    fun onEditBoyNameChange(name: String) { _uiState.update { it.copy(editBoyNameInput = name) } }
+    fun onEditBoyRoleChange(role: String) { _uiState.update { it.copy(editBoyRoleInput = role) } }
+    fun onEditBoyNotesChange(notes: String) { _uiState.update { it.copy(editBoyNotesInput = notes) } }
+    fun onEditBoyNotesForAiChange(notesForAi: String) { _uiState.update { it.copy(editBoyNotesForAiInput = notesForAi) } }
+    
     fun onSaveEditTheBoy() {
         val state = _uiState.value
-        val editingBoy = state.editingTheBoy ?: return
-
-        val name = state.editBoyNameInput
-        val role = state.editBoyRoleInput
-        var nameError: String? = null
-        var roleError: String? = null
-
-        if (name.isBlank()) nameError = "Name cannot be empty."
-        if (role.isBlank()) roleError = "Role cannot be empty."
-
-        if (nameError != null || roleError != null) {
-            _uiState.value = state.copy(
-                editBoyNameError = nameError,
-                editBoyRoleError = roleError
-            )
-            return
-        }
-
-        val boyToSave = editingBoy.copy(
-            name = name,
-            role = role,
-            notes = state.editBoyNotesInput.takeIf { it.isNotBlank() },
-            notesForAi = state.editBoyNotesForAiInput.takeIf { it.isNotBlank() }
+        val boy = state.editingTheBoy!!.copy(
+            name = state.editBoyNameInput,
+            role = state.editBoyRoleInput,
+            notes = state.editBoyNotesInput,
+            notesForAi = state.editBoyNotesForAiInput
         )
-
         viewModelScope.launch {
-            theBoysRepository.updateTheBoy(boyToSave)
-            _uiState.value = _uiState.value.copy(
-                showEditTheBoyDialog = false,
-                snackbarMessage = "'Boy' details updated successfully.",
-                editingTheBoy = null
-            )
+            theBoysRepository.updateTheBoy(boy)
+            _uiState.update { it.copy(showEditTheBoyDialog = false) }
         }
     }
-
-    fun onDeleteTheBoy(theBoy: TheBoysInfo) {
+    
+    fun onDeleteTheBoy(boy: TheBoysInfo) {
         viewModelScope.launch {
-            theBoysRepository.deleteTheBoy(theBoy)
-            _uiState.value = _uiState.value.copy(snackbarMessage = "'Boy' deleted.")
+            theBoysRepository.deleteTheBoy(boy)
         }
     }
-
+    
     fun onManageCategoriesClicked() {
-        _uiState.value = _uiState.value.copy(showManageCategoriesDialog = true)
+        _uiState.update { it.copy(showManageCategoriesDialog = true) }
     }
 
     fun onDismissManageCategoriesDialog() {
-        _uiState.value = _uiState.value.copy(showManageCategoriesDialog = false)
+        _uiState.update { it.copy(showManageCategoriesDialog = false) }
     }
-
+    
     fun onAddNewCategoryClicked() {
-        _uiState.value = _uiState.value.copy(
-            showAddCategoryDialog = true,
-            newCategoryInput = "",
-            newCategoryError = null
-        )
+        _uiState.update { it.copy(showAddCategoryDialog = true) }
     }
-
+    
     fun onDismissAddCategoryDialog() {
-        _uiState.value = _uiState.value.copy(
-            showAddCategoryDialog = false,
-            newCategoryInput = "",
-            newCategoryError = null
-        )
+        _uiState.update { it.copy(showAddCategoryDialog = false) }
     }
 
     fun onNewCategoryInputChange(name: String) {
-        _uiState.value = _uiState.value.copy(newCategoryInput = name, newCategoryError = null)
+        _uiState.update { it.copy(newCategoryInput = name) }
     }
-
+    
     fun onSaveNewCategory() {
-        val categoryName = _uiState.value.newCategoryInput
-        if (categoryName.isBlank()) {
-            _uiState.value = _uiState.value.copy(newCategoryError = "Category name cannot be empty.")
-            return
-        }
-        if (_uiState.value.activityCategories.any { it.name.equals(categoryName, ignoreCase = true) }) {
-            _uiState.value = _uiState.value.copy(newCategoryError = "Category with this name already exists.")
-            return
-        }
-
+        val category = ActivityCategory(name = _uiState.value.newCategoryInput)
         viewModelScope.launch {
-            activityCategoryRepository.insertCategory(ActivityCategory(name = categoryName))
-            _uiState.value = _uiState.value.copy(
-                showAddCategoryDialog = false,
-                newCategoryInput = "",
-                newCategoryError = null,
-                snackbarMessage = "Category '$categoryName' added successfully."
-            )
+            activityCategoryRepository.insertCategory(category)
+            _uiState.update { it.copy(showAddCategoryDialog = false) }
         }
     }
 
     fun onEditCategoryClicked(category: ActivityCategory) {
-        _uiState.value = _uiState.value.copy(
-            showEditCategoryDialog = true,
-            editingCategory = category,
-            editCategoryInput = category.name,
-            editCategoryError = null
-        )
+        _uiState.update { it.copy(editingCategory = category, showEditCategoryDialog = true) }
     }
 
     fun onDismissEditCategoryDialog() {
-        _uiState.value = _uiState.value.copy(
-            showEditCategoryDialog = false,
-            editingCategory = null,
-            editCategoryInput = "",
-            editCategoryError = null
-        )
+        _uiState.update { it.copy(showEditCategoryDialog = false) }
     }
 
     fun onEditCategoryInputChange(name: String) {
-        _uiState.value = _uiState.value.copy(editCategoryInput = name, editCategoryError = null)
+        _uiState.update { it.copy(editCategoryInput = name) }
     }
-
+    
     fun onSaveEditCategory() {
-        val currentCategory = _uiState.value.editingCategory ?: return
-        val newName = _uiState.value.editCategoryInput
-
-        if (newName.isBlank()) {
-            _uiState.value = _uiState.value.copy(editCategoryError = "Category name cannot be empty.")
-            return
-        }
-        if (newName.equals(currentCategory.name, ignoreCase = true)) {
-            onDismissEditCategoryDialog()
-            return
-        }
-        if (_uiState.value.activityCategories.any { it.name.equals(newName, ignoreCase = true) && it.id != currentCategory.id }) {
-            _uiState.value = _uiState.value.copy(editCategoryError = "Category with this name already exists.")
-            return
-        }
-
+        val category = _uiState.value.editingCategory!!.copy(name = _uiState.value.editCategoryInput)
         viewModelScope.launch {
-            activityCategoryRepository.updateCategory(currentCategory.copy(name = newName))
-            _uiState.value = _uiState.value.copy(
-                showEditCategoryDialog = false,
-                editingCategory = null,
-                editCategoryInput = "",
-                editCategoryError = null,
-                snackbarMessage = "Category '${currentCategory.name}' updated to '$newName' successfully."
-            )
+            activityCategoryRepository.updateCategory(category)
+            _uiState.update { it.copy(showEditCategoryDialog = false) }
         }
     }
-
+    
     fun onDeleteCategory(category: ActivityCategory) {
         viewModelScope.launch {
-            workActivityRepository.updateCategoryNameForExistingLogs(oldCategoryName = category.name, newCategoryName = "(Deleted Category)")
             activityCategoryRepository.deleteCategory(category)
-            _uiState.value = _uiState.value.copy(snackbarMessage = "Category '${category.name}' deleted. Associated logs updated.")
         }
     }
 }

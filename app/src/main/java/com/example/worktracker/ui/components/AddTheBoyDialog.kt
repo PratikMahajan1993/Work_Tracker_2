@@ -19,10 +19,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.worktracker.ui.screens.preferences.PreferencesUiState // Assuming this will be adapted for TheBoys
+import com.example.worktracker.ui.screens.preferences.PreferencesUiState
 
-// Field constants for TheBoysInfo - can be moved to ViewModel/UiState later
-const val FIELD_BOY_ID = "boyId"
+// Field constants for TheBoysInfo
 const val FIELD_BOY_NAME = "boyName"
 const val FIELD_BOY_ROLE = "boyRole"
 const val FIELD_BOY_NOTES = "boyNotes"
@@ -32,7 +31,7 @@ const val FIELD_BOY_NOTES_AI = "boyNotesAi"
 @Composable
 fun AddTheBoyDialog(
     showDialog: Boolean,
-    uiState: PreferencesUiState, // This will need to be adapted or a new UiState created for TheBoys
+    uiState: PreferencesUiState,
     onInputChange: (fieldName: String, value: String) -> Unit,
     onNextStep: () -> Unit,
     onPreviousStep: () -> Unit,
@@ -41,10 +40,8 @@ fun AddTheBoyDialog(
 ) {
     if (!showDialog) return
 
-    // Assuming addTheBoyStep and newTheBoyInputs/Errors will be added to PreferencesUiState
-    val currentStep = uiState.addTheBoyStep ?: 0 
+    val currentStep = uiState.addTheBoyStep
     val fieldOrder = listOf(
-        FIELD_BOY_ID,
         FIELD_BOY_NAME,
         FIELD_BOY_ROLE,
         FIELD_BOY_NOTES,
@@ -56,11 +53,10 @@ fun AddTheBoyDialog(
     }
 
     val currentField = fieldOrder[currentStep]
-    val currentValue = uiState.newTheBoyInputs?.get(currentField) ?: ""
-    val currentError = uiState.newTheBoyErrors?.get(currentField)
+    val currentValue = uiState.newTheBoyInputs[currentField] ?: ""
+    val currentError = uiState.newTheBoyErrors[currentField]
 
     val (label, keyboardType, isOptional) = when (currentField) {
-        FIELD_BOY_ID -> Triple("Boy ID*", KeyboardType.Number, false)
         FIELD_BOY_NAME -> Triple("Boy Name*", KeyboardType.Text, false)
         FIELD_BOY_ROLE -> Triple("Role*", KeyboardType.Text, false)
         FIELD_BOY_NOTES -> Triple("Notes (Optional)", KeyboardType.Text, true)

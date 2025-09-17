@@ -6,8 +6,8 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "operator_info")
 data class OperatorInfo(
-    @PrimaryKey
-    val operatorId: Int, // User-defined ID, not auto-generated
+    @PrimaryKey(autoGenerate = true)
+    val operatorId: Int = 0, // Now auto-generated
     val name: String,
     val hourlySalary: Double,
     val role: String,
