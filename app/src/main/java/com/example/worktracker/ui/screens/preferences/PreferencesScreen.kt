@@ -24,10 +24,9 @@ import com.example.worktracker.ui.components.EditTheBoyDialog
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-// Removed: import androidx.compose.material.icons.filled.Login
-// Removed: import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.Login // Added AutoMirrored
 import androidx.compose.material.icons.automirrored.filled.Logout // Added AutoMirrored
+import androidx.compose.material.icons.filled.CloudUpload // Added for the new button
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,10 +73,10 @@ fun PreferencesScreen(
         if (uiState.currentUser == null) {
             Button(
                 onClick = { viewModel.onSignInClicked() },
-                enabled = !uiState.isAccountActionInProgress,
+                enabled = !uiState.isAccountActionInProgress && !uiState.isForcePushInProgress,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
             ) {
-                Icon(Icons.AutoMirrored.Filled.Login, contentDescription = "Sign In Icon", modifier = Modifier.size(ButtonDefaults.IconSize)) // Updated Icon
+                Icon(Icons.AutoMirrored.Filled.Login, contentDescription = "Sign In Icon", modifier = Modifier.size(ButtonDefaults.IconSize))
                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                 Text("Sign In with Google")
             }
@@ -89,16 +88,32 @@ fun PreferencesScreen(
             )
             Button(
                 onClick = { showSignOutConfirmDialog = true },
-                enabled = !uiState.isAccountActionInProgress,
+                enabled = !uiState.isAccountActionInProgress && !uiState.isForcePushInProgress,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
             ) {
-                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Sign Out Icon", modifier = Modifier.size(ButtonDefaults.IconSize)) // Updated Icon
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Sign Out Icon", modifier = Modifier.size(ButtonDefaults.IconSize))
                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                 Text("Sign Out")
             }
+
+            // New Button for Pushing All Local Data
+            Button(
+                onClick = { viewModel.onForcePushAllLocalDataToFirebase() },
+                enabled = !uiState.isAccountActionInProgress && !uiState.isForcePushInProgress,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            ) {
+                Icon(Icons.Filled.CloudUpload, contentDescription = "Push Data Icon", modifier = Modifier.size(ButtonDefaults.IconSize))
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text("Push All Local Data to Firebase")
+            }
         }
-        if (uiState.isAccountActionInProgress) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 8.dp))
+        if (uiState.isAccountActionInProgress || uiState.isForcePushInProgress) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                 CircularProgressIndicator()
+            }
         }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
@@ -163,7 +178,7 @@ fun PreferencesScreen(
             modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
         )
         Button(
-            onClick = { navController.navigate(AppRoutes.MANAGE_COMPONENTS) }, 
+            onClick = { navController.navigate(AppRoutes.MANAGE_COMPONENTS) },
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
         ) {
             Text("Add/Edit Manufacturing Components")

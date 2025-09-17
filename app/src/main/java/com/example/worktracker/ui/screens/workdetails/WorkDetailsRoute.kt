@@ -54,10 +54,8 @@ fun WorkDetailsRoute(
             onAssignedByChanged = coordinator::onAssignedByChanged,
             // Component actions
             onToggleComponentSelectionDialog = coordinator::onToggleComponentSelectionDialog,
-            onComponentSelected = coordinator::onComponentSelected,
-            // The Boys actions
-            onToggleTheBoySelectionDialog = coordinator::onToggleTheBoySelectionDialog,
-            onTheBoySelected = coordinator::onTheBoySelected
+            onComponentSelected = coordinator::onComponentSelected
+            // Removed The Boys actions
         )
     }
 

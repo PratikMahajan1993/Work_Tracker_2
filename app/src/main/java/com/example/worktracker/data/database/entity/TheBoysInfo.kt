@@ -1,5 +1,6 @@
 package com.example.worktracker.data.database.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -9,5 +10,7 @@ data class TheBoysInfo(
     val name: String,
     val role: String,
     val notes: String?,
-    val notesForAi: String?
+    val notesForAi: String?,
+    @ColumnInfo(name = "last_modified")
+    val lastModified: Long = System.currentTimeMillis()
 )

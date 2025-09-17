@@ -7,6 +7,11 @@ import androidx.credentials.CredentialManager // Added for CredentialManager
 import androidx.credentials.exceptions.GetCredentialException // Added for GetCredentialException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.asFlow // Required for LiveData.asFlow()
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.example.worktracker.BuildConfig
 import com.example.worktracker.data.database.AppDatabase // Added import for AppDatabase
 import com.example.worktracker.data.database.entity.ActivityCategory
@@ -22,6 +27,7 @@ import com.example.worktracker.di.AppModule.KEY_SMS_CONTACT
 import com.example.worktracker.ui.signin.GoogleAuthUiClient // Added for GoogleAuthUiClient
 import com.example.worktracker.ui.signin.SignInErrorType // Added for SignInErrorType
 import com.example.worktracker.ui.signin.UserData // Added for UserData
+import com.example.worktracker.workers.UploadAllDataWorker // Import the new worker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext // Added for ApplicationContext
 import kotlinx.coroutines.Dispatchers // Added for Dispatchers.IO
@@ -30,11 +36,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.collect // For collecting the flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext // Added for withContext
 import javax.inject.Inject
 
 private const val TAG = "PreferencesViewModel"
+private const val UPLOAD_ALL_DATA_WORK_NAME = "uploadAllLocalDataToFirebase"
 
 // Field constants for OperatorInfo
 const val FIELD_OPERATOR_ID = "operatorId"
@@ -137,19 +145,21 @@ data class PreferencesUiState(
 
     // Account Management States
     val currentUser: UserData? = null,
-    val isAccountActionInProgress: Boolean = false
+    val isAccountActionInProgress: Boolean = false,
+    val isForcePushInProgress: Boolean = false // New state for tracking force push
 )
 
 @HiltViewModel
 class PreferencesViewModel @Inject constructor(
-    @param:ApplicationContext private val applicationContext: Context, 
+    @param:ApplicationContext private val applicationContext: Context,
     private val sharedPreferences: SharedPreferences,
-    private val appDatabase: AppDatabase, 
-    private val workActivityRepository: WorkActivityRepository, 
+    private val appDatabase: AppDatabase,
+    private val workActivityRepository: WorkActivityRepository,
     private val operatorRepository: OperatorRepository,
     private val activityCategoryRepository: ActivityCategoryRepository,
     private val theBoysRepository: TheBoysRepository,
-    private val googleAuthUiClient: GoogleAuthUiClient
+    private val googleAuthUiClient: GoogleAuthUiClient,
+    private val workManager: WorkManager // Added WorkManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PreferencesUiState())
@@ -181,11 +191,75 @@ class PreferencesViewModel @Inject constructor(
         loadActivityCategories()
         loadTheBoys()
         loadCurrentUser()
+        observeForcePushWorker() // Start observing the worker status
     }
 
     private fun loadCurrentUser() {
         _uiState.value = _uiState.value.copy(currentUser = googleAuthUiClient.getSignedInUser())
     }
+
+    fun onForcePushAllLocalDataToFirebase() {
+        if (_uiState.value.currentUser == null) {
+            _uiState.value = _uiState.value.copy(snackbarMessage = "You must be signed in to push data.")
+            return
+        }
+        if (_uiState.value.isForcePushInProgress) {
+            _uiState.value = _uiState.value.copy(snackbarMessage = "Data push already in progress.")
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(isForcePushInProgress = true, snackbarMessage = "Starting full data push to cloud...")
+
+        val uploadWorkRequest = OneTimeWorkRequestBuilder<UploadAllDataWorker>().build()
+        workManager.enqueueUniqueWork(
+            UPLOAD_ALL_DATA_WORK_NAME,
+            ExistingWorkPolicy.REPLACE, // Or KEEP if you don't want to interrupt an ongoing one
+            uploadWorkRequest
+        )
+    }
+
+    private fun observeForcePushWorker() {
+        viewModelScope.launch { // Launch a coroutine for collecting the Flow
+            workManager.getWorkInfosForUniqueWorkLiveData(UPLOAD_ALL_DATA_WORK_NAME) // Corrected method name
+                .asFlow()
+                .collect { workInfoList: List<WorkInfo>? -> // Expect a list
+                    val workInfo = workInfoList?.firstOrNull() // Get the first WorkInfo, if available
+                    if (workInfo == null) return@collect
+
+                    when (workInfo.state) {
+                        WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING, WorkInfo.State.BLOCKED -> {
+                            if (!_uiState.value.isForcePushInProgress || _uiState.value.snackbarMessage?.contains("Starting") == true) { 
+                                _uiState.value = _uiState.value.copy(
+                                    isForcePushInProgress = true,
+                                    snackbarMessage = "Pushing data to cloud..."
+                                )
+                            } else {
+                                _uiState.value = _uiState.value.copy(isForcePushInProgress = true) 
+                            }
+                        }
+                        WorkInfo.State.SUCCEEDED -> {
+                            _uiState.value = _uiState.value.copy(
+                                isForcePushInProgress = false,
+                                snackbarMessage = "All local data successfully pushed to cloud."
+                            )
+                        }
+                        WorkInfo.State.FAILED -> {
+                            _uiState.value = _uiState.value.copy(
+                                isForcePushInProgress = false,
+                                snackbarMessage = "Failed to push all local data. Check logs."
+                            )
+                        }
+                        WorkInfo.State.CANCELLED -> {
+                            _uiState.value = _uiState.value.copy(
+                                isForcePushInProgress = false,
+                                snackbarMessage = "Data push cancelled."
+                            )
+                        }
+                    }
+                }
+        }
+    }
+
 
     fun onSignInClicked() {
         viewModelScope.launch {
@@ -403,17 +477,17 @@ class PreferencesViewModel @Inject constructor(
                         operators = emptyList(),
                         activityCategories = emptyList(),
                         theBoysList = emptyList(),
-                        currentUser = null 
+                        currentUser = null
                     )
 
                     // Re-initialize necessary states from (now empty) data sources
                     checkIfPasswordIsSet()
                     loadSmsContact()
-                    checkIfGeminiApiKeyIsSet()
-                    loadOperators() 
+                    checkIfGeminiApiKeyIsSet() // Corrected method call
+                    loadOperators()
                     loadActivityCategories()
                     loadTheBoys()
-                    loadCurrentUser() 
+                    loadCurrentUser()
 
                 } catch (e: Exception) {
                     Log.e(TAG, "Error during master reset: ", e)
@@ -536,7 +610,7 @@ class PreferencesViewModel @Inject constructor(
     fun onOperatorPasswordAttemptChange(password: String) {
         _uiState.value = _uiState.value.copy(operatorPasswordAttempt = password, operatorPasswordError = null)
     }
-    
+
     fun onUnlockSectionAttempt() {
         val attempt = _uiState.value.operatorPasswordAttempt
         if (attempt == BuildConfig.OPERATOR_INFO_PASSWORD) {
@@ -895,7 +969,7 @@ class PreferencesViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(newTheBoyErrors = currentErrors)
             return
         }
-        
+
         val boyToSave = TheBoysInfo(
             boyId = id!!,
             name = name,

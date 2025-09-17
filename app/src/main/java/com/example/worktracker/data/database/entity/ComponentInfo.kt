@@ -27,5 +27,8 @@ data class ComponentInfo(
     val cycleTimeMinutes: Double, // Changed from Int to Double
 
     @ColumnInfo(name = "notes_for_ai")
-    val notesForAi: String?
+    val notesForAi: String?,
+
+    @ColumnInfo(name = "last_modified")
+    val lastModified: Long = System.currentTimeMillis()
 )

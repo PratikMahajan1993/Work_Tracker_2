@@ -6,6 +6,13 @@ import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential // Required for CustomCredential handling
 import androidx.credentials.GetCredentialRequest
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.example.worktracker.R
+import com.example.worktracker.data.sync.SyncWorker
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential // For GoogleIdTokenCredential.createFrom and .TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
 import com.google.firebase.auth.FirebaseAuth
@@ -14,7 +21,6 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.FirebaseAuthException
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.CancellationException
-import com.example.worktracker.R
 
 private const val TAG = "GoogleAuthUiClient"
 
@@ -27,7 +33,7 @@ sealed class SignInErrorType {
 }
 
 class GoogleAuthUiClient(
-    private val context: Context,
+    private val context: Context, // Application context should be provided here by Hilt or manually
 ) {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val credentialManager: CredentialManager by lazy { CredentialManager.create(context) }
@@ -44,14 +50,12 @@ class GoogleAuthUiClient(
     }
 
     private suspend fun processSignIn(credential: androidx.credentials.Credential): SignInResult {
-        val idToken: String? // Changed to val as it's assigned only once per successful path
+        val idToken: String?
 
         if (credential is GoogleIdTokenCredential) {
-            // This case might still be valid if CredentialManager directly returns GoogleIdTokenCredential
             idToken = credential.idToken
         } else if (credential is CustomCredential && 
                    credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-            // Handle CustomCredential for Google Sign-In
             try {
                 val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                 idToken = googleIdTokenCredential.idToken
@@ -72,16 +76,37 @@ class GoogleAuthUiClient(
             )
         }
 
-        // The redundant 'if (idToken == null)' check has been removed here.
-        // If code execution reaches this point, idToken is guaranteed to be non-null.
-
         return try {
-            // idToken is non-null here, so direct usage is safe.
             val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
             val firebaseUser: FirebaseUser? = auth.signInWithCredential(firebaseCredential).await()?.user
 
             if (firebaseUser != null) {
                 Log.i(TAG, "Firebase Sign-In successful for user: ${firebaseUser.uid}")
+
+                // --- Trigger SyncWorker to download data on successful sign-in ---
+                try {
+                    val workManager = WorkManager.getInstance(context.applicationContext) // Use applicationContext
+                    val constraints = Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .build()
+                    val downloadRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+                        .setConstraints(constraints)
+                        .build()
+                    
+                    // Use REPLACE policy to ensure data downloads if user signs out and back in
+                    workManager.enqueueUniqueWork(
+                        "DownloadUserDataOnSignIn_${firebaseUser.uid}", // Unique name per user
+                        ExistingWorkPolicy.REPLACE, 
+                        downloadRequest
+                    )
+                    Log.i(TAG, "Enqueued SyncWorker for data download for user: ${firebaseUser.uid}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to enqueue SyncWorker on sign-in", e)
+                    // Optionally, you might want to inform the user or handle this error
+                    // but the sign-in itself was successful.
+                }
+                // --- End of SyncWorker trigger ---
+
                 SignInResult(
                     data = UserData(
                         userId = firebaseUser.uid,

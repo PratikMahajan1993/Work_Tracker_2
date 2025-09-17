@@ -1,5 +1,6 @@
 package com.example.worktracker.data.database.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -12,5 +13,7 @@ data class OperatorInfo(
     val role: String,
     val priority: Int, // e.g., 1-5 scale
     val notes: String?,
-    val notesForAi: String?
+    val notesForAi: String?,
+    @ColumnInfo(name = "last_modified")
+    val lastModified: Long = System.currentTimeMillis()
 )

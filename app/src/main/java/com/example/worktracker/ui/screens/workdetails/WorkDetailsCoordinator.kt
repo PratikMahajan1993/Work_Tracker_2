@@ -80,12 +80,5 @@ class WorkDetailsCoordinator(
         viewModel.onComponentSelected(componentId, isSelected)
     }
 
-    // The Boys selection methods
-    fun onToggleTheBoySelectionDialog(show: Boolean) {
-        viewModel.onToggleTheBoySelectionDialog(show)
-    }
-
-    fun onTheBoySelected(boyId: Long, isSelected: Boolean) {
-        viewModel.onTheBoySelected(boyId, isSelected)
-    }
+    // Removed The Boys selection methods
 }

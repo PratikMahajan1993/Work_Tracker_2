@@ -4,19 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.worktracker.data.database.entity.ComponentInfo
-import com.example.worktracker.data.database.entity.TheBoysInfo
 import com.example.worktracker.data.database.entity.WorkActivityLog
 import com.example.worktracker.data.repository.ActivityCategoryRepository
 import com.example.worktracker.data.repository.ComponentInfoRepository
-import com.example.worktracker.data.repository.TheBoysRepository
 import com.example.worktracker.data.repository.WorkActivityRepository
-// Assuming a structure like this is defined or will be defined in the repository/data layer
-// For the purpose of this ViewModel, we'll assume it exists:
-// data class WorkActivityLogWithDetails(
-//     val workActivity: WorkActivityLog,
-//     val components: List<ComponentInfo>,
-//     val theBoys: List<TheBoysInfo>
-// )
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,7 +26,6 @@ const val ROUTE_ARG_WORK_LOG_ID = "workLogId"
 class GenericWorkDetailsViewModel @Inject constructor(
     private val workActivityRepository: WorkActivityRepository,
     private val componentInfoRepository: ComponentInfoRepository,
-    private val theBoysRepository: TheBoysRepository,
     private val activityCategoryRepository: ActivityCategoryRepository,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -60,24 +50,19 @@ class GenericWorkDetailsViewModel @Inject constructor(
             )
         }
 
-        // Collect available components and boys, and update selected lists in session
+        // Collect available components and update selected lists in session
         viewModelScope.launch {
             combine(
                 componentInfoRepository.getAllComponents(),
-                theBoysRepository.getAllTheBoys(),
                 _uiState // Depend on uiState to re-filter when selected IDs change
-            ) { availableComponents, availableTheBoys, currentState ->
-                Triple(availableComponents, availableTheBoys, currentState)
-            }.collectLatest { (availableComponents, availableTheBoys, currentState) ->
+            ) { availableComponents, currentState ->
+                Pair(availableComponents, currentState)
+            }.collectLatest { (availableComponents, currentState) ->
                 _uiState.update {
                     it.copy(
                         availableComponents = availableComponents,
-                        availableTheBoys = availableTheBoys,
                         selectedComponentsInSession = availableComponents.filter { comp ->
                             currentState.selectedComponentIds.contains(comp.id)
-                        },
-                        selectedTheBoysInSession = availableTheBoys.filter { boy ->
-                            currentState.selectedTheBoyIds.contains(boy.boyId.toLong())
                         }
                     )
                 }
@@ -85,7 +70,6 @@ class GenericWorkDetailsViewModel @Inject constructor(
         }
 
         if (isEditMode) { // Simplified condition
-            // navWorkLogId is guaranteed to be non-null here if isEditMode is true
             loadWorkLogForEditing(navWorkLogId!!)
         } else {
             loadOngoingOrNewLog(categoryName)
@@ -96,13 +80,13 @@ class GenericWorkDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             // ASSUMPTION: workActivityRepository.getWorkActivityWithDetailsById exists
-            // and returns a data class WorkActivityLogWithDetails(workActivity: WorkActivityLog, components: List<ComponentInfo>, theBoys: List<TheBoysInfo>)
+            // and returns a data class WorkActivityLogWithDetails(workActivity: WorkActivityLog, components: List<ComponentInfo>)
             val details = workActivityRepository.getWorkActivityWithDetailsById(workLogId) // Placeholder for actual call
             if (details != null) {
                 val log = details.workActivity
                 _uiState.update {
                     it.copy(
-                        currentLogId = log.id, // For consistency, though editingWorkLogId is the primary key for edit
+                        currentLogId = log.id,
                         startTime = log.startTime,
                         endTime = log.endTime,
                         duration = log.duration,
@@ -113,7 +97,6 @@ class GenericWorkDetailsViewModel @Inject constructor(
                         taskSuccessful = log.taskSuccessful,
                         assignedBy = log.assignedBy,
                         selectedComponentIds = details.components.map { c -> c.id }.toSet(),
-                        selectedTheBoyIds = details.theBoys.map { b -> b.boyId.toLong() }.toSet(),
                         initialEndTimeForEdit = log.endTime,
                         initialDurationForEdit = log.duration,
                         isLoading = false,
@@ -146,8 +129,7 @@ class GenericWorkDetailsViewModel @Inject constructor(
                                 taskSuccessful = log.taskSuccessful,
                                 assignedBy = log.assignedBy,
                                 selectedComponentIds = ongoingActivityDetails.components.map { c -> c.id }.toSet(),
-                                selectedTheBoyIds = ongoingActivityDetails.theBoys.map { b -> b.boyId.toLong() }.toSet(),
-                                endTime = null, // Ongoing, so no end time
+                                endTime = null,
                                 duration = null,
                                 isLoading = false,
                                 error = null
@@ -167,10 +149,9 @@ class GenericWorkDetailsViewModel @Inject constructor(
                                 taskSuccessful = null,
                                 assignedBy = null,
                                 selectedComponentIds = emptySet(),
-                                selectedTheBoyIds = emptySet(),
                                 isLoading = false,
                                 error = null,
-                                logDate = System.currentTimeMillis() // Reset log date for new entry
+                                logDate = System.currentTimeMillis()
                             )
                         }
                     }
@@ -218,29 +199,13 @@ class GenericWorkDetailsViewModel @Inject constructor(
             }
             it.copy(selectedComponentIds = newSelectedIds)
         }
-        // Display update will be handled by the combined flow in init
     }
 
-    fun onToggleTheBoySelectionDialog(show: Boolean) {
-        _uiState.update { it.copy(showTheBoySelectionDialog = show) }
-    }
-
-    fun onTheBoySelected(boyId: Long, isSelected: Boolean) {
-        _uiState.update {
-            val newSelectedIds = if (isSelected) {
-                it.selectedTheBoyIds + boyId
-            } else {
-                it.selectedTheBoyIds - boyId
-            }
-            it.copy(selectedTheBoyIds = newSelectedIds)
-        }
-        // Display update will be handled by the combined flow in init
-    }
+    // Removed TheBoys selection dialog functions
 
     fun onStartPressed() {
         val currentState = _uiState.value
         if (currentState.isEditMode || currentState.currentLogId != null || currentState.startTime != null) {
-            // Should not start if already in edit mode, or if a log is already active/started.
             return
         }
 
@@ -252,20 +217,19 @@ class GenericWorkDetailsViewModel @Inject constructor(
                 categoryName = currentState.categoryName,
                 categoryId = currentCategory?.id?.toLong(),
                 startTime = currentTime,
-                description = currentState.description, // Can be empty at start
+                description = currentState.description,
                 operatorId = currentState.operatorId.toIntOrNull(),
                 expenses = currentState.expenses.toDoubleOrNull(),
                 logDate = currentState.logDate,
-                taskSuccessful = currentState.taskSuccessful, // Can be null at start
-                assignedBy = currentState.assignedBy, // Can be null at start
+                taskSuccessful = currentState.taskSuccessful,
+                assignedBy = currentState.assignedBy,
                 endTime = null,
                 duration = null
             )
             try {
                 val newId = workActivityRepository.insertWorkActivity(
                     log = newLog,
-                    componentIds = currentState.selectedComponentIds.toList(),
-                    theBoyIds = currentState.selectedTheBoyIds.toList()
+                    componentIds = currentState.selectedComponentIds.toList()
                 )
                 _uiState.update {
                     it.copy(
@@ -284,11 +248,10 @@ class GenericWorkDetailsViewModel @Inject constructor(
     private fun validateInputsAndSetButtonState() {
         val currentState = _uiState.value
         var validationErrorForDisplay: String? = null
-        var blockingError: String? = null // Errors that prevent saving/ending
+        var blockingError: String? = null
 
         val isActivityStarted = currentState.startTime != null
 
-        // Common validations for started/editing activities
         if (isActivityStarted || currentState.isEditMode) {
             if (currentState.description.isBlank()) {
                 blockingError = blockingError ?: "Description cannot be empty."
@@ -310,7 +273,6 @@ class GenericWorkDetailsViewModel @Inject constructor(
             validationErrorForDisplay = "Expenses must be a valid non-negative number or empty."
         }
         
-        // Button enabled if activity started (for create/resume) or in edit mode, and no blocking errors
         val allMandatoryConditionsMet = (isActivityStarted || currentState.isEditMode) &&
                 currentState.description.isNotBlank() &&
                 (currentState.operatorId.isEmpty() || currentState.operatorId.toIntOrNull() != null) &&
@@ -321,7 +283,7 @@ class GenericWorkDetailsViewModel @Inject constructor(
 
         _uiState.update {
             it.copy(
-                isEndButtonEnabled = allMandatoryConditionsMet, // "End" or "Update" button
+                isEndButtonEnabled = allMandatoryConditionsMet,
                 error = if (allMandatoryConditionsMet && finalErrorForDisplay == validationErrorForDisplay) {
                     validationErrorForDisplay
                 } else {
@@ -331,7 +293,7 @@ class GenericWorkDetailsViewModel @Inject constructor(
         }
     }
 
-    fun onSaveOrUpdatePressed() { // Renamed from onEndPressed
+    fun onSaveOrUpdatePressed() {
         validateInputsAndSetButtonState()
         val currentState = _uiState.value
 
@@ -352,14 +314,11 @@ class GenericWorkDetailsViewModel @Inject constructor(
 
             if (currentState.isEditMode) {
                 logIdToUse = currentState.editingWorkLogId
-                finalStartTime = currentState.startTime // startTime should be populated from loaded log
+                finalStartTime = currentState.startTime
                 if (logIdToUse == null || finalStartTime == null) {
                     _uiState.update { it.copy(isLoading = false, error = "Error: Editing information is missing.") }
                     return@launch
                 }
-                // If it was an ongoing log being edited, and user is now "completing" it
-                // Or if it was a completed log, we keep its original end time unless explicitly changed (not supported yet)
-                // For now, if it had an initial end time, we keep it. If not, we set it now.
                 if (currentState.initialEndTimeForEdit == null) {
                     finalEndTime = System.currentTimeMillis()
                     finalDuration = finalEndTime - finalStartTime
@@ -367,7 +326,7 @@ class GenericWorkDetailsViewModel @Inject constructor(
                     finalEndTime = currentState.initialEndTimeForEdit
                     finalDuration = currentState.initialDurationForEdit
                 }
-            } else { // Create/Resume mode - completing an ongoing log
+            } else {
                 logIdToUse = currentState.currentLogId
                 finalStartTime = currentState.startTime
                 if (logIdToUse == null || finalStartTime == null) {
@@ -389,22 +348,19 @@ class GenericWorkDetailsViewModel @Inject constructor(
                 description = currentState.description,
                 operatorId = currentState.operatorId.toIntOrNull(),
                 expenses = currentState.expenses.toDoubleOrNull(),
-                logDate = currentState.logDate, // Use logDate from state (could be original or current if new)
-                taskSuccessful = currentState.taskSuccessful, // Not null due to validation
-                assignedBy = currentState.assignedBy, // Not null due to validation
+                logDate = currentState.logDate,
+                taskSuccessful = currentState.taskSuccessful,
+                assignedBy = currentState.assignedBy,
                 duration = finalDuration
             )
 
             try {
-                workActivityRepository.insertWorkActivity( // insertWorkActivity should handle upsert
+                workActivityRepository.insertWorkActivity(
                     log = logEntry,
-                    componentIds = currentState.selectedComponentIds.toList(),
-                    theBoyIds = currentState.selectedTheBoyIds.toList()
+                    componentIds = currentState.selectedComponentIds.toList()
                 )
                 _uiState.update { it.copy(isLoading = false) }
                 _navigationEvent.emit(NavigationEvent.NavigateBack)
-                // UI reset for non-edit mode will happen upon re-entering the screen if it's a "create new" scenario
-                // or if getOngoingActivityByCategoryName returns null next time.
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, error = "Failed to save: ${e.message}") }
             }

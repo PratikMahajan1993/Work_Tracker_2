@@ -11,15 +11,13 @@ import com.example.worktracker.data.database.dao.TheBoysInfoDao
 import com.example.worktracker.data.database.dao.ProductionActivityDao
 import com.example.worktracker.data.database.dao.ComponentInfoDao
 import com.example.worktracker.data.database.dao.WorkActivityComponentCrossRefDao
-import com.example.worktracker.data.database.dao.WorkActivityTheBoyCrossRefDao
-import com.example.worktracker.data.database.entity.WorkActivityLog
+import com.example.worktracker.data.database.entity.WorkActivityLog 
 import com.example.worktracker.data.database.entity.OperatorInfo
 import com.example.worktracker.data.database.entity.ActivityCategory
 import com.example.worktracker.data.database.entity.TheBoysInfo
 import com.example.worktracker.data.database.entity.ProductionActivity
 import com.example.worktracker.data.database.entity.ComponentInfo
 import com.example.worktracker.data.database.entity.WorkActivityComponentCrossRef
-import com.example.worktracker.data.database.entity.WorkActivityTheBoyCrossRef
 
 @Database(
     entities = [
@@ -29,11 +27,10 @@ import com.example.worktracker.data.database.entity.WorkActivityTheBoyCrossRef
         TheBoysInfo::class,
         ProductionActivity::class,
         ComponentInfo::class,
-        WorkActivityComponentCrossRef::class,
-        WorkActivityTheBoyCrossRef::class
+        WorkActivityComponentCrossRef::class
     ], 
-    version = 14, // Incremented version to 14
-    exportSchema = false // Consider setting to true and committing schemas to version control
+    version = 17,
+    exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun workActivityDao(): WorkActivityDao
@@ -43,7 +40,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun productionActivityDao(): ProductionActivityDao
     abstract fun componentInfoDao(): ComponentInfoDao
     abstract fun workActivityComponentCrossRefDao(): WorkActivityComponentCrossRefDao
-    abstract fun workActivityTheBoyCrossRefDao(): WorkActivityTheBoyCrossRefDao
 
     companion object {
         val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -146,32 +142,23 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_11_12 = object : Migration(11, 12) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // 1. Create new table with cycle_time_minutes as REAL
                 db.execSQL("""
                     CREATE TABLE component_info_new (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         component_name TEXT NOT NULL,
                         customer TEXT NOT NULL,
                         priority_level INTEGER NOT NULL,
-                        cycle_time_minutes REAL NOT NULL, -- Changed to REAL
+                        cycle_time_minutes REAL NOT NULL, 
                         notes_for_ai TEXT
                     )
                 """.trimIndent())
-
-                // 2. Copy data from old table to new table, casting cycle_time_minutes
                 db.execSQL("""
                     INSERT INTO component_info_new (id, component_name, customer, priority_level, cycle_time_minutes, notes_for_ai)
                     SELECT id, component_name, customer, priority_level, CAST(cycle_time_minutes AS REAL), notes_for_ai
                     FROM component_info
                 """.trimIndent())
-
-                // 3. Drop the old table
                 db.execSQL("DROP TABLE component_info")
-
-                // 4. Rename the new table to the original name
                 db.execSQL("ALTER TABLE component_info_new RENAME TO component_info")
-
-                // 5. Re-create index
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_component_info_component_name` ON `component_info` (`component_name`)")
             }
         }
@@ -185,6 +172,65 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_13_14 = object : Migration(13, 14) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE production_activity ADD COLUMN rejectionQuantity INTEGER NULL")
+            }
+        }
+
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE work_activity_logs ADD COLUMN last_modified INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE operator_info ADD COLUMN last_modified INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE activity_categories ADD COLUMN last_modified INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE the_boys_info ADD COLUMN last_modified INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE production_activity ADD COLUMN last_modified INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE component_info ADD COLUMN last_modified INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS `work_activity_the_boy_cross_ref`")
+            }
+        }
+
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Step 1: Create the new table with boyId as nullable
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `production_activity_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `boyId` INTEGER,  -- Changed to nullable
+                        `componentName` TEXT NOT NULL,
+                        `machineNumber` INTEGER NOT NULL,
+                        `productionQuantity` INTEGER NOT NULL,
+                        `startTime` INTEGER NOT NULL,
+                        `endTime` INTEGER NOT NULL,
+                        `duration` INTEGER NOT NULL,
+                        `downtimeMinutes` INTEGER,
+                        `rejectionQuantity` INTEGER,
+                        `last_modified` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+
+                // Step 2: Copy the data from the old table to the new table
+                db.execSQL("""
+                    INSERT INTO `production_activity_new` (
+                        `id`, `boyId`, `componentName`, `machineNumber`, `productionQuantity`,
+                        `startTime`, `endTime`, `duration`, `downtimeMinutes`, `rejectionQuantity`, `last_modified`
+                    )
+                    SELECT
+                        `id`, `boyId`, `componentName`, `machineNumber`, `productionQuantity`,
+                        `startTime`, `endTime`, `duration`, `downtimeMinutes`, `rejectionQuantity`, `last_modified`
+                    FROM `production_activity`
+                """.trimIndent())
+
+                // Step 3: Drop the old table
+                db.execSQL("DROP TABLE `production_activity`")
+
+                // Step 4: Rename the new table to the original name
+                db.execSQL("ALTER TABLE `production_activity_new` RENAME TO `production_activity`")
+
+                // Step 5: Recreate indexes (Room will handle foreign keys based on entity)
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_production_activity_boyId` ON `production_activity` (`boyId`)")
             }
         }
     }

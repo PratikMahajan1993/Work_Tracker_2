@@ -1,241 +1,307 @@
-# Work Tracker Android Project Summary for AI Agent
-
-This document serves as the foundational knowledge base for the AI agent to understand and align with the "Work Tracker" Android project. All future development activities should refer to and adhere to the principles, structures, and details outlined herein.
-
----
+# Project Summary: Work Tracker
 
 ## 1) Complete App Structure
 
-The "Work Tracker" application is designed to help users log their work activities, view history, generate reports, interact with an AI chatbot, and manage preferences including a master reset functionality.
-
 ### a) Brief App Routemap
 
-The application's core navigation revolves around a bottom navigation bar, offering five primary destinations: Dashboard, History, Reports, ChatBot, and Preferences. These are top-level screens. Additionally, there are deeper navigation routes for logging new work activities, viewing details of a specific work activity, and a screen to view all logs (though largely superseded by History and Reports).
+The application starts with a `SIGN_IN_SCREEN`. Upon successful authentication (or choosing to continue as a guest), the user is navigated to the `MAIN_SCREEN`. From the `MAIN_SCREEN`, users can navigate to various features including:
+- Logging new work/production activities (`SELECT_CATEGORY` then `WORK_DETAILS`, or directly to `LOG_PRODUCTION_ACTIVITY`).
+- Viewing/editing existing work/production logs (navigating to `WORK_DETAILS` or `LOG_PRODUCTION_ACTIVITY` with specific IDs).
+- Managing app preferences (`PREFERENCES_SCREEN`).
+- Managing and viewing components (`MANAGE_COMPONENTS`, `VIEW_COMPONENTS`).
 
 ### b) App Navigation Routes
 
-The application uses Jetpack Compose Navigation for managing screens.
-The main navigation graph is defined in `MainActivity.kt` using `AppNavigationHost`.
-The bottom navigation bar itself is constructed in `MainScreen.kt`, and its routes are defined in `BottomNavScreen.kt`.
+The primary navigation routes are defined in `AppRoutes.kt` and managed by Jetpack Navigation Compose in `MainActivity.kt`.
 
-**`AppRoutes` (defined in `MainActivity.kt`):**
-*   `MAIN_SCREEN = "mainScreen"`: The entry point for the bottom navigation container.
-*   `LOG_WORK_ACTIVITY = "logWorkActivity"`: Route for logging a new work activity.
-*   `VIEW_LOGS = "viewLogs"`: Route for a generic view of logs (currently used minimally, mostly as a placeholder or specific list view).
+- **`AppRoutes.SIGN_IN_SCREEN`**: ("sign_in_screen") - Initial screen for user authentication.
+- **`AppRoutes.MAIN_SCREEN`**: ("main_screen") - Main dashboard/central screen after login.
+- **`AppRoutes.SELECT_CATEGORY`**: ("select_category") - Screen to select a category for a new work log.
+- **`AppRoutes.WORK_DETAILS`**: ("work_details/{categoryName}?workLogId={workLogId}") - Screen for creating or editing detailed work logs.
+    - `categoryName`: (String path argument) The name of the work category.
+    - `workLogId`: (Long query parameter, optional, defaults to 0L) The ID of the work log to edit; 0L or absent for a new log.
+- **`AppRoutes.LOG_PRODUCTION_ACTIVITY`**: ("log_production_activity?productionLogId={productionLogId}") - Screen for creating or editing production logs.
+    - `productionLogId`: (Long query parameter, optional, defaults to 0L) The ID of the production log to edit; 0L or absent for a new log.
+- **`AppRoutes.MANAGE_COMPONENTS`**: ("manage_components", and "manage_components/{componentId}") - Screen for adding new components or editing an existing one.
+    - `componentId`: (Long path argument, optional) The ID of the component to edit.
+- **`AppRoutes.VIEW_COMPONENTS`**: ("view_components") - Screen to list and view existing components.
+- **`AppRoutes.PREFERENCES_SCREEN`**: ("preferences_screen") - Screen for managing application settings.
 
-**Bottom Navigation Routes (defined in `BottomNavScreen.kt` and used within `MainScreen.kt`):**
-*   `Dashboard = "dashboard"`: Displays the primary dashboard with ongoing activities and quick actions.
-*   `History = "history"`: Shows a history of logged work activities.
-*   `Reports = "reports"`: Provides reporting functionalities.
-*   `ChatBot = "chatbot"`: Integrates an AI chatbot for various interactions.
-*   `Preferences = "preferences_route"`: Manages app-level settings and the master reset.
+Helper functions like `AppRoutes.workDetailsRoute()` and `AppRoutes.logProductionActivityRoute()` are provided to build these routes with parameters.
 
-**Deep Link/Parameterized Routes:**
-*   `ROUTE_WORK_DETAILS = "workDetails/{categoryName}"` (defined in `ui.screens.workdetails.WorkDetailsRoute`): Navigates to a specific work activity's details screen, requiring a `categoryName` argument.
+### c) Details of Various Screens
 
-### c) Details of Various Screens (Mentioned in succession as they are in the app navigation route)
+(Based on navigation flow and directory structure)
 
-1.  **`MainActivity.kt`**: The application's entry point, `ComponentActivity` that sets up `enableEdgeToEdge()` and the main `AppNavigationHost`.
-2.  **`MainScreen.kt`**: The primary container screen that hosts the `BottomNavigationBar` and the `NavHost` for the bottom navigation destinations. It acts as a wrapper around the main content areas.
-3.  **`DashboardScreen.kt` (Accessed via `BottomNavScreen.Dashboard`)**:
-    *   **Purpose:** Displays the user's current work status, quick actions, and potentially ongoing activities.
-    *   **Key Components:** Likely contains a button to start a new activity, a list of ongoing activities, and a summary of recent work.
-    *   **ViewModel:** Uses `DashboardViewModel`.
-4.  **`HistoryScreen.kt` (Accessed via `BottomNavScreen.History`)**:
-    *   **Purpose:** Shows a historical list of all logged work activities. Currently displays an empty state if no logs exist.
-    *   **Key Components:** `EmptyHistoryContent` composable which shows a "No work logs yet" message and a "Log Your First Activity" button.
-    *   **ViewModel:** Will likely use `HistoryViewModel` in the future to fetch and display logs.
-5.  **`ReportsHubScreen.kt` (Accessed via `BottomNavScreen.Reports`)**:
-    *   **Purpose:** Provides an interface for users to generate and export reports of their work activities.
-    *   **Key Components:** Buttons/options for different report types (e.g., PDF export), date range selectors.
-    *   **ViewModel:** Uses `ReportsViewModel`.
-6.  **`ChatBotScreen.kt` (Accessed via `BottomNavScreen.ChatBot`)**:
-    *   **Purpose:** Allows users to interact with an integrated AI chatbot for queries related to their work data or general assistance.
-    *   **Key Components:** Text input for messages, chat history display.
-    *   **ViewModel:** Uses `ChatBotViewModel` which leverages `GeminiProService`.
-7.  **`PreferencesScreen.kt` (Accessed via `BottomNavScreen.Preferences`)**:
-    *   **Purpose:** Manages app-level settings, notably the "Master Reset" password and functionality.
-    *   **Key Components:**
-        *   A button to "Set Master Reset Password" or "Change Master Reset Password".
-        *   A `SetPasswordDialog` for setting or modifying the password.
-        *   A "Master Reset (Wipe All Data)" button (styled in red), visible only if a master password is set.
-        *   A `ConfirmActionPasswordDialog` for confirming the master reset with the password.
-        *   Snackbar messages for user feedback.
-    *   **ViewModel:** Uses `PreferencesViewModel`.
-8.  **`LogWorkActivityScreen.kt` (Accessed via `AppRoutes.LOG_WORK_ACTIVITY`)**:
-    *   **Purpose:** Facilitates the logging of new work activities, allowing users to specify categories, descriptions, and start/end times.
-    *   **Key Components:** Input fields for activity details, start/stop buttons.
-    *   **ViewModel:** Uses `LogWorkActivityViewModel`.
-9.  **`WorkDetailsRoute.kt` / `WorkDetailsScreen.kt` (Accessed via `ROUTE_WORK_DETAILS`)**:
-    *   **Purpose:** Displays detailed information about a specific work activity log, identified by its category name.
-    *   **Key Components:** Text views for details, potentially editing options.
-    *   **ViewModel:** Uses `WorkDetailsViewModel`.
-10. **`ViewLogsScreen.kt` (Accessed via `AppRoutes.VIEW_LOGS`)**:
-    *   **Purpose:** A generic screen to view logs. Its usage might overlap with `HistoryScreen` but could be intended for specific filtered views or debugging.
-    *   **Key Components:** Likely a list or table of work logs.
-    *   **ViewModel:** `ViewLogsViewModel`.
+1.  **`SignInScreen`** (`com.example.worktracker.ui.signin`):
+    *   Handles user authentication via Google Sign-In.
+    *   Allows users to continue as a guest.
+    *   Uses `SignInViewModel` and `GoogleAuthUiClient`.
+    *   Navigates to `MAIN_SCREEN` on successful sign-in or guest mode.
 
+2.  **`MainScreen`** (`com.example.worktracker.ui.MainScreen.kt`):
+    *   Central screen after login, likely a dashboard displaying summaries or navigation to other features.
+    *   Provides navigation to create/edit work logs and production logs.
+    *   The internal structure of `MainScreen` itself (e.g., if it uses a Bottom Navigation Bar to host Dashboard, History, etc.) would require inspecting `MainScreen.kt`'s content, but it serves as the entry to core features.
+
+3.  **Core Feature Screens (often within `MainScreen` or navigated from it):**
+
+    *   **`DashboardScreen`** (`com.example.worktracker.ui.screens.dashboard`):
+        *   Displays an overview or dashboard, potentially recent activities.
+        *   Uses `DashboardViewModel` and `DashboardUiState`.
+        *   Composables: `DashboardScreen`, `RecentActivityItem`.
+
+    *   **`HistoryScreen`** (`com.example.worktracker.ui.screens.history`):
+        *   Displays a history of logs (e.g., work logs).
+        *   Uses `HistoryViewModel` and `HistoryUiState`.
+        *   Composables: `HistoryScreen`, `HistoryListItem`.
+
+    *   **`LogWorkActivityScreen`** (`com.example.worktracker.ui.logwork`):
+        *   This screen corresponds to the `SELECT_CATEGORY` route.
+        *   Allows users to select a category for a new work log before proceeding to `WorkDetailsScreen`.
+
+    *   **`WorkDetailsRoute` / `WorkDetailsScreen`** (`com.example.worktracker.ui.screens.workdetails`):
+        *   Handles creation and editing of detailed work logs.
+        *   Receives `categoryName` and optional `workLogId`.
+        *   Uses `GenericWorkDetailsViewModel`, `WorkDetailsState`, `WorkDetailsActions`, and a `WorkDetailsCoordinator` to manage its complex logic.
+
+    *   **`LogProductionScreen`** (`com.example.worktracker.ui.logproduction`):
+        *   Handles creation and editing of production activity logs.
+        *   Receives optional `productionLogId`.
+        *   Likely uses a ViewModel and State similar to other logging screens. (Specific ViewModel/State files were not explicitly listed in this path but are expected).
+
+    *   **`PreferencesScreen`** (`com.example.worktracker.ui.screens.preferences`):
+        *   Manages application settings.
+        *   Includes functionality for managing operators (add, edit, list), setting SMS contacts, and Gemini API keys.
+        *   Uses `PreferencesViewModel`.
+        *   Composables: `PreferencesScreen`, `AddOperatorDialog`, `EditOperatorDialog`, `OperatorListDialog`, `SetSmsContactDialog`, `SetGeminiApiKeyDialog`, `OperatorPasswordDialog`, and components within a `components` subdirectory.
+
+    *   **`ManageComponentsScreen` / `ComponentListScreen`** (`com.example.worktracker.ui.screens.preferences.components`):
+        *   `ManageComponentsScreen`: For adding or editing components.
+        *   `ComponentListScreen` (corresponding to `VIEW_COMPONENTS` route): For listing/viewing components. These are likely related to the `PreferencesScreen`'s component management features.
+
+### d) Complete File Directory with Comments
+
+```
+C:/Users/asus/AndroidStudioProjects/WorkTracker2/
+├── app/
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── java/
+│   │   │   │   └── com/example/worktracker/
+│   │   │   │       ├── AppRoutes.kt        # Defines navigation routes for the app
+│   │   │   │       ├── MainActivity.kt     # Main entry point activity, sets up NavHost
+│   │   │   │       ├── MyApplication.kt    # Application class, Hilt entry point, WorkManager setup
+│   │   │   │       ├── GeminiProService.kt # Service related to Gemini AI (details not fully explored)
+│   │   │   │       │
+│   │   │   │       ├── core/
+│   │   │   │       │   └── PdfGenerator.kt # Utility for generating PDF documents
+│   │   │   │       │
+│   │   │   │       ├── data/
+│   │   │   │       │   ├── database/
+│   │   │   │       │   │   ├── AppDatabase.kt    # Room database main class
+│   │   │   │       │   │   ├── WorkLog.kt        # (Likely an older or top-level entity/DAO placeholder)
+│   │   │   │       │   │   ├── WorkLogDao.kt     # (Likely an older or top-level DAO placeholder)
+│   │   │   │       │   │   ├── dao/              # Directory for Data Access Objects (DAOs)
+│   │   │   │       │   │   │   └── ... (Other DAOs)
+│   │   │   │       │   │   ├── entity/           # Directory for Room database entities
+│   │   │   │       │   │   │   ├── ActivityCategory.kt
+│   │   │   │       │   │   │   ├── ComponentInfo.kt
+│   │   │   │       │   │   │   ├── OperatorInfo.kt
+│   │   │   │       │   │   │   ├── ProductionActivity.kt
+│   │   │   │       │   │   │   ├── TheBoysInfo.kt # (Purpose less clear from name alone)
+│   │   │   │       │   │   │   ├── WorkActivityComponentCrossRef.kt # Join table for WorkActivity-Component
+│   │   │   │       │   │   │   └── WorkActivityLog.kt
+│   │   │   │       │   │   ├── mappers/          # Directory for data mapping functions
+│   │   │   │       │   │   └── relation/         # Directory for Room @Relation classes/objects
+│   │   │   │       │   │
+│   │   │   │       │   ├── repository/         # Interfaces and implementations for repositories
+│   │   │   │       │   │   ├── ActivityCategoryRepository.kt / Impl.kt
+│   │   │   │       │   │   ├── ComponentInfoRepository.kt / Impl.kt
+│   │   │   │       │   │   ├── OperatorRepository.kt / Impl.kt
+│   │   │   │       │   │   ├── ProductionActivityRepository.kt / Impl.kt
+│   │   │   │       │   │   ├── TheBoysRepository.kt / Impl.kt # (Purpose less clear)
+│   │   │   │       │   │   └── WorkActivityRepository.kt / Impl.kt
+│   │   │   │       │   │
+│   │   │   │       │   └── sync/               # Classes related to data synchronization
+│   │   │   │       │       └── SyncWorker.kt     # WorkManager worker for background sync
+│   │   │   │       │
+│   │   │   │       ├── di/                   # Dependency Injection modules (Hilt)
+│   │   │   │       │   ├── AppModule.kt        # Application-level dependencies
+│   │   │   │       │   └── DatabaseModule.kt   # Database-related dependencies (Room, DAOs)
+│   │   │   │       │
+│   │   │   │       └── ui/                   # UI layer, Jetpack Compose screens and components
+│   │   │   │           ├── MainScreen.kt       # Composable for the main screen/content area post-login
+│   │   │   │           │
+│   │   │   │           ├── components/         # Common UI components (not fully explored)
+│   │   │   │           │
+│   │   │   │           ├── logproduction/      # Screen for logging production activities
+│   │   │   │           │   └── LogProductionScreen.kt
+│   │   │   │           │   └── ... (Likely ViewModel, State)
+│   │   │   │           │
+│   │   │   │           ├── logwork/            # Screen for selecting work category
+│   │   │   │           │   └── LogWorkActivityScreen.kt
+│   │   │   │           │   └── ... (Likely ViewModel, State)
+│   │   │   │           │
+│   │   │   │           ├── reports/            # Screens/components related to reports (not fully explored)
+│   │   │   │           │   └── ReportsViewModel.kt # (ViewModel found, screen composable expected)
+│   │   │   │           │
+│   │   │   │           ├── screens/            # Main feature screens
+│   │   │   │           │   ├── dashboard/
+│   │   │   │           │   │   ├── DashboardScreen.kt
+│   │   │   │           │   │   ├── DashboardUiState.kt
+│   │   │   │           │   │   ├── DashboardViewModel.kt
+│   │   │   │           │   │   └── RecentActivityItem.kt
+│   │   │   │           │   ├── history/
+│   │   │   │           │   │   ├── HistoryScreen.kt
+│   │   │   │           │   │   ├── HistoryUiState.kt
+│   │   │   │           │   │   ├── HistoryViewModel.kt
+│   │   │   │           │   │   └── HistoryListItem.kt
+│   │   │   │           │   ├── preferences/
+│   │   │   │           │   │   ├── PreferencesScreen.kt
+│   │   │   │           │   │   ├── PreferencesViewModel.kt
+│   │   │   │           │   │   ├── AddOperatorDialog.kt
+│   │   │   │           │   │   ├── EditOperatorDialog.kt
+│   │   │   │           │   │   ├── OperatorListDialog.kt
+│   │   │   │           │   │   ├── OperatorPasswordDialog.kt
+│   │   │   │           │   │   ├── SetGeminiApiKeyDialog.kt
+│   │   │   │           │   │   ├── SetSmsContactDialog.kt
+│   │   │   │           │   │   └── components/       # Components specific to preferences
+│   │   │   │           │   │       └── ComponentListScreen.kt  (View Components)
+│   │   │   │           │   │       └── ManageComponentsScreen.kt (Add/Edit Components)
+│   │   │   │           │   └── workdetails/
+│   │   │   │           │       ├── WorkDetailsRoute.kt
+│   │   │   │           │       ├── WorkDetailsActions.kt
+│   │   │   │           │       ├── WorkDetailsCoordinator.kt
+│   │   │   │           │       ├── WorkDetailsScreen.kt
+│   │   │   │           │       ├── WorkDetailsState.kt
+│   │   │   │           │       └── GenericWorkDetailsViewModel.kt
+│   │   │   │           │
+│   │   │   │           ├── signin/             # Sign-in screen UI and logic
+│   │   │   │           │   ├── GoogleAuthUiClient.kt
+│   │   │   │           │   ├── SignInScreen.kt
+│   │   │   │           │   ├── SignInViewModel.kt
+│   │   │   │           │   ├── SignInState.kt (implied, or part of ViewModel)
+│   │   │   │           │   └── SignInUiEvent.kt
+│   │   │   │           │
+│   │   │   │           ├── theme/              # Jetpack Compose theme (colors, typography, shapes)
+│   │   │   │           │   ├── Color.kt
+│   │   │   │           │   ├── Shape.kt
+│   │   │   │           │   ├── Theme.kt
+│   │   │   │           │   └── Typography.kt
+│   │   │   │           │
+│   │   │   │           └── viewlogs/           # Screens/components for viewing logs (not fully explored)
+│   │   │   │               └── ...
+│   │   │   ├── res/                  # Android resources (drawables, layouts, values, etc.)
+│   │   │   └── AndroidManifest.xml   # Application manifest file
+│   │   │
+│   │   └── test/                 # Unit tests
+│   │   └── androidTest/          # Instrumented tests
+│   │
+│   └── build.gradle.kts          # App-level Gradle build script
+│
+├── build.gradle.kts              # Project-level Gradle build script
+├── settings.gradle.kts           # Gradle settings script
+└── local.properties              # Local configuration (API keys, passwords - not part of repo)
+```
 
 ### e) Any other details that might help with understanding the App
 
-*   **Project Root:** `C:/Users/asus/AndroidStudioProjects/WorkTracker`
-*   **Project Name:** `Work Tracker`
-*   **Modules:** The project has 8 modules, with `Work_Tracker.app.main` being the primary application module where most development takes place.
-*   **Edge-to-Edge Display:** The application is configured for edge-to-edge display using `enableEdgeToEdge()` in `MainActivity.kt`. This means content draws behind the system bars (status and navigation), and the theme handles only the appearance of the system bar icons (light/dark).
-*   **Theming:** The application uses a custom, non-dynamic color theme defined in `ui/theme/Color.kt` and `ui/theme/Theme.kt`. The default `dynamicColor` parameter in `WorkTrackerTheme` is set to `false`.
-*   **AI Integration:** The `GeminiProService` provides an interface for connecting to the Google Gemini Pro model for chatbot features.
-*   **PDF Generation:** The `PdfGenerator.kt` utility handles the creation of PDF reports, which suggests interaction with local storage and potentially file sharing.
+*   **Kotlin Focus**: The project is primarily written in Kotlin.
+*   **Modern Android Development**: Utilizes the latest Android Jetpack libraries and follows recommended practices.
+*   **MVVM Architecture**: Most screens follow an MVVM (Model-View-ViewModel) or a similar state management pattern (ViewModel, UI State, Screen).
+*   **Coordinator Pattern**: The `WorkDetailsScreen` uses a `WorkDetailsCoordinator`, suggesting a pattern to handle complex navigation or business logic flow for that specific screen.
+*   **Background Sync**: `SyncWorker` (using WorkManager) is set up for periodic and initial data synchronization, likely with Firebase Firestore.
+*   **BuildConfig Fields**: The app uses `buildConfigField` to expose sensitive information (like passwords) from `local.properties` to the app code, which is a good practice for not hardcoding them.
 
----
+## 2) Coding conventions and techniques used :
 
-## 2) Coding Conventions and Techniques Used
+### a) List of all the good practises used in the architechture
 
-The "Work Tracker" project adheres to modern Android development best practices, primarily leveraging Jetpack Compose and Hilt for a robust and maintainable architecture.
+*   **Clear Separation of Concerns**:
+    *   **UI Layer (`ui` package)**: Contains Activities, Composable screens, and ViewModels.
+    *   **Data Layer (`data` package)**: Contains repositories, database entities/DAOs, and data synchronization logic.
+    *   **Domain Layer (Implicit)**: While not an explicit `domain` package, the ViewModels and Repositories interactions imply a domain layer handling business logic.
+*   **MVVM/State Management**: Consistent use of ViewModels (`androidx.lifecycle.ViewModel`) to hold and manage UI-related data, exposing it via State objects (often using Kotlin Flows like `StateFlow` collected as state in Composables).
+*   **Repository Pattern**: Abstraction of data sources through repository interfaces (`data/repository`), with implementations provided via Hilt. This decouples ViewModels from concrete data source implementations.
+*   **Dependency Injection (DI)**: Hilt is used extensively for managing dependencies, making the code more modular, testable, and maintainable.
+*   **Single Activity Architecture**: The app uses a `MainActivity` hosting a `NavHostController` for managing different screens (Composable destinations), which is a common modern Android practice.
+*   **Modular UI Components**: Breaking down UI into smaller, reusable Composables (e.g., `RecentActivityItem`, various Dialogs).
+*   **Navigation Compose**: Jetpack Navigation Compose is used for navigating between screens, with routes defined centrally in `AppRoutes.kt`.
+*   **Background Tasks with WorkManager**: `SyncWorker` is used for reliable background data synchronization, respecting system optimizations.
+*   **Kotlin Coroutines**: Asynchronous operations are handled using Kotlin coroutines, evident in ViewModel scopes and interactions with suspend functions in repositories/DAOs.
+*   **Type Safety**: Kotlin's strong type system is leveraged throughout the codebase.
+*   **Use of KSP**: Kotlin Symbol Processing (KSP) is used for Room and Hilt, which is generally faster than KAPT.
 
-### a) List of all the good practices used in the architecture
+### b) Details about things like Hilt DI etc. being used.
 
-*   **MVVM (Model-View-ViewModel) Architecture:** Clearly separates concerns:
-    *   **View (Composables):** `*-Screen.kt` files are declarative UI, observing state from ViewModels and emitting events.
-    *   **ViewModel:** `*-ViewModel.kt` files hold UI state, expose it as `StateFlow`, handle UI logic, and interact with repositories. They are lifecycle-aware.
-    *   **Model (Data Layer):** Comprises `data` package, including `repository` interfaces/implementations and `database` (Room DAO/entities).
-*   **Repository Pattern:** Abstracts data sources (local database, network, SharedPreferences) behind a clean API (`WorkActivityRepository`). This allows the ViewModel to remain agnostic to where data comes from.
-*   **Dependency Injection (DI) with Hilt:** Promotes loose coupling, testability, and easier management of dependencies.
-*   **Structured Concurrency with Kotlin Coroutines and Flows:** Asynchronous operations (database calls, AI requests) are managed using Kotlin Coroutines (`viewModelScope.launch`) and data streams are handled with Kotlin Flows (`StateFlow`, `MutableSharedFlow`).
-*   **Single Source of Truth:** Data is primarily managed through the `WorkActivityRepository`, ensuring consistency.
-*   **UI State Management:** ViewModels expose UI state via `StateFlow` for Composables to `collectAsState()`, ensuring reactive UI updates. `LaunchedEffect` is used for side effects like showing Snackbars.
-*   **Separation of Concerns:** Distinct packages for `data`, `di`, `navigation`, `ui`, etc.
-*   **Clear Naming Conventions:** Files and classes are named descriptively (e.g., `WorkActivityLog`, `PreferencesViewModel`).
-*   **Immutability for UI State:** `data class PreferencesUiState(...)` ensures that UI state is immutable, simplifying state changes and preventing bugs.
-
-### b) Details about things like Hilt DI etc. being used
-
-*   **Hilt Setup:** Hilt is integrated into the project with `MyApplication.kt` annotated with `@HiltAndroidApp` and `MainActivity.kt` with `@AndroidEntryPoint`. ViewModels are injected using `@HiltViewModel`.
-*   **`AppModule.kt` (`@Module`, `@InstallIn(SingletonComponent::class)`):** This is the core Hilt module providing singleton instances of key dependencies:
-    *   **`SharedPreferences`:** Provided by `context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)`. This instance is used for storing key-value pairs like the `KEY_MASTER_PASSWORD`.
-    *   **`GeminiProService`:** Provides the connection to the AI chatbot.
-    *   **`WorkActivityRepository`:** The interface `WorkActivityRepository` is provided, with its concrete implementation `WorkActivityRepositoryImpl` being instantiated.
-    *   **Room Database Components:** (Assumed to be provided via a separate `DatabaseModule.kt` or directly in `AppModule.kt` if simplified, often `WorkActivityDao` and `WorkActivityDatabase` would be here).
-*   **Injected ViewModels:** ViewModels like `PreferencesViewModel` and `ReportsViewModel` use `@Inject constructor(...)` to receive their dependencies (e.g., `SharedPreferences`, `WorkActivityRepository`).
+*   **Hilt**:
+    *   **`@HiltAndroidApp`**: `MyApplication` is annotated with `@HiltAndroidApp` to enable Hilt DI at the application level.
+    *   **`@AndroidEntryPoint`**: `MainActivity` is annotated with `@AndroidEntryPoint` to allow Hilt to inject dependencies into it. ViewModels are also typically injected into Composable screens using `hiltViewModel()`.
+    *   **Modules**:
+        *   `di/AppModule.kt`: Provides application-wide dependencies (e.g., `GoogleAuthUiClient`, `Context`, potentially Retrofit/other service clients if any were added).
+        *   `di/DatabaseModule.kt`: Provides database-related dependencies like the Room `AppDatabase` instance and various DAOs.
+    *   **ViewModel Injection**: ViewModels are injected into Composable functions using `hiltViewModel()`.
+    *   **Repository Injection**: Repositories are injected into ViewModels. DAOs are injected into Repository implementations.
+    *   **WorkManager Integration**: Hilt is integrated with WorkManager (`androidx.hilt.work`) to allow dependency injection into `ListenableWorker` implementations like `SyncWorker`.
 
 ### c) Details about the UI (Mention what libraries and practises are used)
 
-*   **Jetpack Compose:** The entire UI is built declaratively using Jetpack Compose, ensuring a modern Android UI toolkit.
-*   **Material Design 3 (M3):** The application uses Material 3 components, indicated by imports like `androidx.compose.material3.*` and the `MaterialTheme` composable in `Theme.kt`. This includes components like `Scaffold`, `Button`, `Text`, `OutlinedTextField`, `AlertDialog`, `SnackbarHost`, etc.
-*   **Compose Navigation:** `androidx.navigation:navigation-compose` is used for handling navigation between composable screens.
-*   **Hilt Navigation Compose:** `androidx.hilt:hilt-navigation-compose` is used to facilitate injecting `ViewModel` instances directly into `Composable` functions using `hiltViewModel()`.
-*   **State Management in Compose:**
-    *   `collectAsState()`: Observes `StateFlow` from ViewModels and converts them into Compose `State`, triggering recomposition when data changes.
-    *   `remember { ... }`: Used for remembering objects across recompositions, such as `SnackbarHostState`.
-    *   `LaunchedEffect`: Handles side effects that need to be triggered in response to state changes (e.g., showing a snackbar message once and then clearing it).
-*   **Image Vectors:** Uses `androidx.compose.material.icons.Icons` for various icons, including the `AutoMirrored` versions for better RTL (Right-to-Left) language support, resolving deprecation warnings.
-*   **Edge-to-Edge Display:** Configured for a modern full-screen experience where app content extends behind the system bars, with system bar icon contrast managed by `WindowCompat`.
+*   **Jetpack Compose**: The entire UI is built using Jetpack Compose.
+    *   **Declarative UI**: UI is described as a function of state.
+    *   **Composable Functions**: Screens and UI elements are built using `@Composable` functions.
+    *   **State Management**: `StateFlow` from ViewModels is collected using `collectAsState()` or `collectAsStateWithLifecycle()` to drive UI updates.
+    *   **Material Design 3**: `androidx.compose.material3:material3` is used, indicating adherence to the latest Material Design guidelines. Components like `Scaffold`, `TextField`, `Button`, `Dialog` etc., are from Material 3.
+    *   **`androidx.compose.material:material-icons-extended`**: Used for a rich set of Material icons.
+    *   **Theme**: A custom theme is defined in the `ui/theme` package (`Theme.kt`, `Color.kt`, `Typography.kt`, `Shape.kt`).
+    *   **Navigation**: Jetpack Navigation Compose (`androidx.navigation:navigation-compose`) is used for in-app navigation, with a `NavHost` in `MainActivity`.
+    *   **Animations**: Basic fade-in/out transitions are implemented for screen navigation.
+    *   **ViewModel Scoped to Navigation Graph**: ViewModels are often scoped to navigation graph destinations, managed by Hilt.
 
 ### d) Details of Databases used to store user input. (Explain in detail)
 
-The application primarily uses the **Room Persistence Library** for structured data storage and **SharedPreferences** for simple key-value pairs.
+*   **Room Persistence Library**:
+    *   **Purpose**: Room is used for local, structured data storage on the device. It provides an abstraction layer over SQLite.
+    *   **`AppDatabase.kt`**: This class, annotated with `@Database`, defines the main database instance, lists all entities, and provides access to DAOs. It's likely configured in `DatabaseModule.kt` for Hilt.
+    *   **Entities (`data/database/entity` directory)**: These are Kotlin data classes annotated with `@Entity`, representing tables in the SQLite database. Key entities include:
+        *   `ActivityCategory`: Stores categories for work activities.
+        *   `ComponentInfo`: Stores information about components.
+        *   `OperatorInfo`: Stores information about operators/users.
+        *   `ProductionActivity`: Stores logs related to production.
+        *   `WorkActivityLog`: Stores detailed work activity logs.
+        *   `WorkActivityComponentCrossRef`: A junction table for the many-to-many relationship between `WorkActivityLog` and `ComponentInfo`.
+        *   `TheBoysInfo`: Purpose is less clear from the name alone, but it's an entity.
+    *   **DAOs (Data Access Objects - `data/database/dao` directory and `WorkLogDao.kt`)**:
+        *   These are interfaces annotated with `@Dao`.
+        *   They define methods (using annotations like `@Insert`, `@Query`, `@Update`, `@Delete`) for interacting with the database tables (e.g., `insertWorkLog`, `getWorkLogById`, `getAllWorkLogs`).
+        *   DAOs are provided by Hilt via `DatabaseModule.kt` and injected into repositories.
+    *   **Type Converters**: If complex data types are stored that Room doesn't natively support, TypeConverters would be used (not explicitly seen, but a common Room feature).
+    *   **Migrations**: For schema changes, Room requires migration strategies (not explicitly seen, but important for app updates).
+    *   **Relationships**: The presence of `WorkActivityComponentCrossRef` and a `relation` subdirectory suggests that Room's relationship features (like `@Relation` for joining data) might be in use.
 
-*   **Room Persistence Library:**
-    *   **`WorkActivityLog` (Entity):**
-        *   Located at `data/database/entity/WorkActivityLog.kt`.
-        *   This is the primary data model for individual work activity entries.
-        *   It defines the schema for the `work_activity_logs` table in the SQLite database.
-        *   Fields likely include `id` (primary key, auto-increment), `categoryName`, `description`, `startTime`, `endTime`, etc.
-    *   **`WorkActivityDao` (Data Access Object):**
-        *   Located at `data/database/dao/WorkActivityDao.kt`.
-        *   An interface defining methods for interacting with the `work_activity_logs` table.
-        *   **Key methods:**
-            *   `insertLog(log: WorkActivityLog)`: Inserts or updates a work activity log (OnConflictStrategy.REPLACE).
-            *   `getAllLogs()`: Returns a `Flow<List<WorkActivityLog>>` for observing all logs.
-            *   `getLogById(id: Long)`: Retrieves a specific log by its ID.
-            *   `deleteLogById(id: Long)`: Deletes a specific log by its ID.
-            *   `getOngoingActivityByCategoryName(categoryName: String)`: Retrieves an active (endTime IS NULL) log for a category.
-            *   `getOngoingActivities()`: Retrieves all active (endTime IS NULL) logs.
-            *   `getRecentLogs()`: Retrieves the 5 most recent logs.
-            *   **`clearAllLogsInternal()`:** A suspend function with `@Query("DELETE FROM work_activity_logs")` to delete all entries from the main log table.
-            *   **`resetAutoIncrementForLogsTable()`:** A suspend function with `@Query("DELETE FROM sqlite_sequence WHERE name='work_activity_logs'")` to reset the auto-increment counter for the `work_activity_logs` table. This is crucial for truly "wiping" the database and ensuring new entries start from ID 1.
-            *   **`wipeDatabaseAndResetIds()`:** An `@Transaction` suspend function that orchestrates both `clearAllLogsInternal()` and `resetAutoIncrementForLogsTable()`. This is the designated method for a complete "Master Reset" of work activity data.
-    *   **`WorkActivityDatabase` (Database Class):**
-        *   Located at `data/database/WorkActivityDatabase.kt`.
-        *   An abstract class annotated with `@Database`, defining the entities (`WorkActivityLog`) and version.
-        *   It provides the abstract `workActivityDao()` method to access the DAO.
-
-*   **SharedPreferences:**
-    *   **Purpose:** Used for storing lightweight, private data in key-value pairs, primarily the `KEY_MASTER_PASSWORD`.
-    *   **`AppModule.kt`:** Provides a singleton instance of `SharedPreferences` named `"WorkTrackerUserPrefs"`.
-    *   **`KEY_MASTER_PASSWORD`:** A constant defined in `AppModule.kt` (`"master_reset_password"`) acts as the key for storing the master reset password.
-    *   **Usage (`PreferencesViewModel`):** The `PreferencesViewModel` injects `SharedPreferences` to `putString()` (save) and `getString()` (retrieve) the master password, as well as `contains()` to check if the password is set.
+*   **Firebase Firestore (Remote Database/Backend)**:
+    *   **Purpose**: Used as a cloud-hosted NoSQL database, likely for:
+        *   User data synchronization across devices.
+        *   Storing data that needs to be backed up or shared.
+        *   Potentially for real-time updates (though this wasn't explicitly confirmed).
+    *   **Dependencies**: `com.google.firebase:firebase-firestore` and `com.google.firebase:firebase-firestore-ktx`.
+    *   **Integration**:
+        *   Repositories likely interact with Firestore to fetch and push data.
+        *   `SyncWorker.kt` is specifically designed to synchronize local Room data with Firestore periodically and on initial app start.
+    *   **Data Structure**: Firestore is a NoSQL document database, so data is stored in collections of documents. The exact structure would be defined by how the repositories interact with Firestore.
 
 ### e) Any other details that might be helpful in future activities which will develop the app.
 
-*   **Testing:** As a good practice, unit and integration tests should be developed for ViewModels, Repositories, and DAOs. Mocking dependencies (especially `SharedPreferences` and `WorkActivityRepository` for ViewModel tests) will be crucial.
-*   **Error Handling:** While some error handling (e.g., password validation) is present, robust error handling across network operations (if any are added) and database interactions should be a priority for new features. Use `Result` or `Either` types for more explicit error propagation.
-*   **Stateful vs. Stateless Composables:** Distinguish between stateful composables (which hold and manage their own state, often for UI-specific, ephemeral state) and stateless composables (which receive all necessary state as parameters and expose events for state changes, improving reusability and testability). Aim for a higher proportion of stateless composables.
-*   **One-Shot Events (Side Effects):** For non-UI state updates like navigation or showing a `Snackbar` that should only occur once per trigger, `MutableSharedFlow` is a good pattern (as initially set up for `_events` in `PreferencesViewModel`, though not actively used in the current version). This prevents events from being re-consumed on configuration changes or recompositions.
-*   **Theme Consistency:** The custom Material Theme (defined in `ui/theme/Theme.kt`, `Color.kt`, `Type.kt`) ensures a consistent visual identity. When introducing new UI elements or screens, always utilize the `MaterialTheme.colorScheme` and `MaterialTheme.typography` to maintain this consistency. Avoid hardcoding colors or fonts directly unless absolutely necessary for a specific, isolated component.
-*   **Accessibility:** Always consider accessibility when developing new UI components. Ensure `contentDescription` is provided for `Icon` and `Image` composables, proper focus management for interactive elements, and sufficient contrast ratios for text and UI elements, especially when designing new custom UI.
-*   **Performance in Compose:** For lists of data (`LazyColumn`, `LazyRow`), ensure that `items` or `itemsIndexed` use a stable `key` parameter (e.g., a unique ID from the data model). This optimizes recomposition performance by allowing Compose to efficiently identify which items have changed.
-*   **Security Considerations:**
-    *   **Master Reset Password:** Currently stored in `SharedPreferences`. While suitable for simple local security, for extremely high-security applications, more robust encryption of this stored password (e.g., using `EncryptedSharedPreferences` from AndroidX Security) might be considered. For this application's scope, the current approach is deemed acceptable.
-    *   **Sensitive Data:** Any other sensitive user data should also be handled with appropriate security measures, whether stored in the database (Room can encrypt the database, but requires additional libraries) or transmitted over a network (HTTPS).
-*   **Localization (Internationalization):** Currently, all strings are hardcoded. For future support of multiple languages, all user-facing strings should be moved into `strings.xml` resources (e.g., `res/values/strings.xml`) and referenced using `stringResource(R.string.my_string_id)`.
-*   **Version Control (Git):** The project is assumed to be under Git version control. All changes should be committed with clear, concise messages, and feature development should ideally occur on separate branches.
-*   **Code Documentation:** Maintain clear and up-to-date documentation (Javadoc/KDoc) for classes, functions, and complex logic, especially for non-obvious implementations or business rules.
-
----
-
-## 3) Agent Prompt
-
-### a) After reading this prompt from a text file which will contain this summary, the AI agent in my android studio project should understand the project completely and thoroughly.
-
-**To the AI Agent:**
-
-"You have been provided with a comprehensive project summary for the 'Work Tracker' Android application. Your primary objective is to internalize this information completely and thoroughly. This document serves as your foundational understanding of the app's architecture, functionality, and established best practices.
-
-**Key areas for your immediate focus and understanding:**
-
-1.  **Core Purpose:** The app helps users track work activities, view history, generate reports, interact with an AI, and manage settings, including a critical master reset function.
-2.  **Architectural Pattern:** MVVM is strictly followed. Understand the responsibilities of Views (Composables), ViewModels, and the Data Layer (Repositories, Room DAO/Entities).
-3.  **Dependency Injection:** Hilt is the DI framework. Recognize `@Inject`, `@HiltViewModel`, `@Module`, and `@InstallIn` annotations and understand what dependencies are provided (e.g., `SharedPreferences`, `WorkActivityRepository`, `GeminiProService`).
-4.  **UI Toolkit:** Jetpack Compose is the exclusive UI toolkit. Be familiar with composable functions, Material Design 3 components, `StateFlow` for UI state, and `LaunchedEffect` for side effects.
-5.  **Navigation:** Jetpack Compose Navigation is used. Distinguish between top-level bottom navigation routes (`BottomNavScreen`) and deeper or parameterized routes. Always refer to `AppRoutes` and `BottomNavScreen` for route definitions.
-6.  **Data Persistence:**
-    *   **Room Database:** Used for `WorkActivityLog` entries. Understand the `WorkActivityDao` methods, especially `wipeDatabaseAndResetIds()` for the master reset.
-    *   **SharedPreferences:** Used for simple key-value storage, specifically the `KEY_MASTER_PASSWORD`.
-7.  **Key Features Implementation:**
-    *   **Master Reset:** Understand its sensitive nature, the role of `PreferencesViewModel`, `SetPasswordDialog`, `ConfirmActionPasswordDialog`, and how it interacts with `SharedPreferences` and `WorkActivityRepository.clearAllLogs()`.
-    *   **Theming:** Recognize the custom green theme and the use of `enableEdgeToEdge()` in `MainActivity` with corresponding `SideEffect` in `Theme.kt` for system bar icon appearance.
-    *   **AI Integration:** Be aware of `GeminiProService` for chatbot functionality.
-8.  **Warning Resolution Strategies:** Note the recent fixes for deprecated icons (using `AutoMirrored`) and system bar color assignments (relying on `enableEdgeToEdge()` and setting icon appearance). Apply similar modern practices when encountering new warnings or deprecations.
-
-**Process for thorough understanding:**
-
-*   **Read the entire summary carefully.**
-*   **Correlate summary points with the actual code structure and file contents.** If a summary point mentions a file or method, mentally (or physically, if your tools allow) locate and review that code.
-*   **Identify relationships:** Understand how `ViewModels` interact with `Repositories`, how `Repositories` interact with `DAOs` and `SharedPreferences`, and how `Composables` observe `ViewModel` state.
-*   **Recognize patterns:** Look for recurring patterns in `ViewModel` state management (`StateFlow`, `_uiState.value.copy(...)`), `Composable` event handling, and dependency injection.
-*   **Prioritize Security and Data Integrity:** Always be mindful of data handling, especially for sensitive operations like the Master Reset.
-
-Your goal is to be able to answer detailed questions about *any* part of this project's current state, design decisions, and implementation choices without further prompting.
-
-### b) Then the AI agent should align itself with this knowledge for any further development activities in the project.
-
-**To the AI Agent:**
-
-"Having thoroughly understood the 'Work Tracker' project based on the provided summary, you will now align your future assistance and development activities with this established knowledge base.
-
-**This alignment means:**
-
-*   **Adherence to Architecture:** All proposed code changes, new features, or refactorings *must* respect and extend the existing MVVM, Repository, and Hilt DI architecture. Do not introduce new architectural patterns or significant deviations unless explicitly instructed and justified.
-*   **Consistent UI/UX:** When creating or modifying UI, utilize Jetpack Compose and Material Design 3. Maintain the established theming, color scheme, and typography. Prioritize accessibility and a consistent user experience.
-*   **Leverage Existing Utilities:** Before implementing new functionality, check if existing services (`GeminiProService`), core utilities (`PdfGenerator`), or data access patterns (Room `WorkActivityDao`, `WorkActivityRepository`) can be leveraged or extended.
-*   **Hilt for Dependencies:** All new dependencies should be managed via Hilt. When a new component requires dependencies, ensure they are provided through an appropriate Hilt module.
-*   **Kotlin Coroutines & Flows:** Continue to use Kotlin Coroutines for asynchronous operations and Kotlin Flows for reactive data streams.
-*   **Robust Data Handling:** Follow the established Room and SharedPreferences usage. For any new data persistence requirements, favor Room for structured data and SharedPreferences for simple settings.
-*   **Security Mindset:** For any features involving sensitive user data or critical actions, immediately consider and implement appropriate security measures, consistent with (or improving upon) the current master password handling.
-*   **No Redundant Code:** Avoid duplicating logic or UI components. Strive for reusable composables and utility functions.
-*   **Address Warnings/Deprecations:** Always prioritize resolving compiler warnings and using non-deprecated APIs. Refer to the solutions implemented for the icon and system bar warnings as examples.
-*   **Clear Communication:** When proposing changes or asking for clarification, reference specific files, lines of code, or sections of this summary to ensure precise communication.
-*   **Incremental Development:** Propose changes in manageable steps (e.g., small, logical code edits followed by build verification) rather than large, monolithic modifications.
-*   **Validate After Changes:** Always perform Gradle Sync, Clean, and Build operations after significant code changes and verify the output for errors or new warnings.
-
-By adhering to this alignment, you will effectively act as an expert Android developer, seamlessly extending and maintaining the 'Work Tracker' application in a professional and efficient manner."
+*   **Focus on Testability**: The architecture (DI with Hilt, Repositories, ViewModels) lends itself well to unit and integration testing. Expanding test coverage should be a priority.
+*   **Error Handling**: While `SignInViewModel` shows some error handling via `UiEvent.ShowError`, a more comprehensive and consistent error handling strategy across all layers (ViewModels, Repositories, data sources) would be beneficial. This could involve a sealed class hierarchy for errors/results.
+*   **User Experience (UX)**:
+    *   **Loading States**: Ensure all asynchronous operations provide clear loading indicators in the UI.
+    *   **Empty States**: Screens displaying lists (e.g., History, Components) should have well-designed empty states.
+    *   **Accessibility**: Review and improve UI accessibility (content descriptions, touch target sizes, etc.).
+*   **Configuration Management**: Secrets like API keys and passwords are read from `local.properties` via `BuildConfig`. This is good, but for team development, a more robust system for managing different build environment configurations (dev, staging, prod) might be needed.
+*   **`TheBoysInfo` and `TheBoysRepository`**: The purpose of these entities and repositories is not immediately clear from their names. Documentation or renaming might be useful for clarity.
+*   **Code Documentation**: Adding KDoc comments to public APIs (classes, methods, Composable functions) will improve maintainability and onboarding for new developers.
+*   **Refinement of `MainScreen.kt`**: The current `MainScreen.kt` acts as a host for navigation but might evolve into a more complex screen with its own UI elements (e.g., Bottom Navigation Bar, Drawer) to switch between major sections like Dashboard, History, Reports, etc.
+*   **`GeminiProService.kt`**: Its role and integration with the Gemini AI SDK (`com.google.ai.client.generativeai:generativeai:0.9.0`) could be a significant feature to explore and document further. It might be used for smart suggestions, data analysis, or other AI-powered features.
+*   **PDF Generation (`PdfGenerator.kt`)**: Details on what data is used for PDF generation and how this feature is invoked would be useful.
+*   **Permissions**: Depending on features (like SMS for `SetSmsContactDialog`), runtime permission handling will be necessary.

@@ -65,7 +65,8 @@ dependencies {
     implementation(libs.firebase.auth)      // Firebase Auth
     implementation(libs.firebase.common)    // Common Firebase utilities
     implementation(libs.firebase.firestore)
-    // implementation(libs.play.services.auth) // Removed conflicting dependency
+    // implementation(libs.firebase.firestore.ktx) // Commented out to use direct declaration
+    implementation("com.google.firebase:firebase-firestore-ktx:25.0.0") // Added direct declaration with version
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -78,9 +79,13 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.generativeai)
 
-    implementation(libs.hilt.android)
-    implementation(libs.androidx.hilt.navigation.compose)
-    ksp(libs.hilt.compiler)
+    implementation(libs.hilt.android) // com.google.dagger:hilt-android
+    implementation(libs.androidx.hilt.navigation.compose) // androidx.hilt:hilt-navigation-compose
+    ksp(libs.hilt.compiler) // com.google.dagger:hilt-compiler
+
+    // Hilt WorkManager Integration
+    implementation(libs.androidx.hilt.work) // androidx.hilt:hilt-work 
+    ksp(libs.androidx.hilt.compiler.ksp)    // Corrected: androidx.hilt:hilt-compiler for KSP
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
@@ -92,6 +97,9 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth) // This is the correct one
     implementation(libs.googleid) // Added for GoogleIdTokenCredential
+
+    // WorkManager Runtime
+    implementation(libs.androidx.work.runtime.ktx) // Added WorkManager
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -9,6 +9,9 @@ interface TheBoysInfoDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(theBoyInfo: TheBoysInfo)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAllTheBoys(theBoys: List<TheBoysInfo>) // New method for SyncWorker
+
     @Update
     suspend fun update(theBoyInfo: TheBoysInfo)
 

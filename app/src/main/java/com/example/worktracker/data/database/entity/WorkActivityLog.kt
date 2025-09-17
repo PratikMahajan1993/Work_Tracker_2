@@ -1,7 +1,9 @@
 package com.example.worktracker.data.database.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Ignore
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -30,5 +32,10 @@ data class WorkActivityLog(
     val logDate: Long,
     val taskSuccessful: Boolean? = null,
     val assignedBy: String? = null,
-    val duration: Long? = null
-)
+    val duration: Long? = null,
+    @ColumnInfo(name = "last_modified")
+    val lastModified: Long = System.currentTimeMillis()
+) {
+    @Ignore // For syncing relationships from Firestore
+    var componentIdsForSync: List<Long>? = null
+}

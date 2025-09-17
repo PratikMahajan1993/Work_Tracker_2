@@ -40,7 +40,9 @@ class DashboardViewModel @Inject constructor(
 
                 // Fetch TheBoysInfo for each production log to get operator names
                 val recentProductionLogItems = rawProductionLogs.map { prodLog ->
-                    val boyInfo = theBoysRepository.getTheBoyById(prodLog.boyId)
+                    val boyInfo = prodLog.boyId?.let { nnBoyId -> // Safely handle nullable boyId
+                        theBoysRepository.getTheBoyById(nnBoyId)
+                    }
                     RecentActivityItem.RecentProductionLogItem(prodLog, boyInfo?.name)
                 }
 

@@ -7,7 +7,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ProductionActivityDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(productionActivity: ProductionActivity)
+    suspend fun insert(productionActivity: ProductionActivity): Long 
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAllProductionActivities(activities: List<ProductionActivity>) // New method for SyncWorker
 
     @Update
     suspend fun update(productionActivity: ProductionActivity)

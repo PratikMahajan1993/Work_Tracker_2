@@ -3,6 +3,7 @@ package com.example.worktracker.di
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.room.Room
+import androidx.work.WorkManager // Added import for WorkManager
 import com.example.worktracker.GeminiProService
 import com.example.worktracker.data.database.AppDatabase
 import com.example.worktracker.data.database.dao.OperatorInfoDao
@@ -12,8 +13,9 @@ import com.example.worktracker.data.database.dao.TheBoysInfoDao
 import com.example.worktracker.data.database.dao.ProductionActivityDao
 import com.example.worktracker.data.database.dao.ComponentInfoDao
 import com.example.worktracker.data.database.dao.WorkActivityComponentCrossRefDao
-import com.example.worktracker.data.database.dao.WorkActivityTheBoyCrossRefDao // Import for TheBoy CrossRef DAO
+// Removed: import com.example.worktracker.data.database.dao.WorkActivityTheBoyCrossRefDao
 import com.example.worktracker.data.repository.OperatorRepository
+import com.example.worktracker.data.repository.OperatorRepositoryImpl
 import com.example.worktracker.data.repository.WorkActivityRepository
 import com.example.worktracker.data.repository.WorkActivityRepositoryImpl
 import com.example.worktracker.data.repository.ActivityCategoryRepository
@@ -24,7 +26,11 @@ import com.example.worktracker.data.repository.ProductionActivityRepository
 import com.example.worktracker.data.repository.ProductionActivityRepositoryImpl
 import com.example.worktracker.data.repository.ComponentInfoRepository
 import com.example.worktracker.data.repository.ComponentInfoRepositoryImpl
-import com.example.worktracker.ui.signin.GoogleAuthUiClient // Added import
+import com.example.worktracker.data.sync.FirestoreSyncManagerImpl
+import com.example.worktracker.data.sync.IFirestoreSyncManager
+import com.example.worktracker.ui.signin.GoogleAuthUiClient
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -40,6 +46,23 @@ object AppModule {
     const val KEY_MASTER_PASSWORD = "master_reset_password"
     const val KEY_SMS_CONTACT = "sms_contact"
     const val KEY_GEMINI_API_KEY = "gemini_api_key"
+
+    @Provides
+    @Singleton
+    fun provideFirebaseAuth(): FirebaseAuth = FirebaseAuth.getInstance()
+
+    @Provides
+    @Singleton
+    fun provideFirebaseFirestore(): FirebaseFirestore = FirebaseFirestore.getInstance()
+
+    @Provides
+    @Singleton
+    fun provideFirestoreSyncManager(
+        firestore: FirebaseFirestore,
+        firebaseAuth: FirebaseAuth
+    ): IFirestoreSyncManager {
+        return FirestoreSyncManagerImpl(firestore, firebaseAuth)
+    }
 
     @Provides
     @Singleton
@@ -78,10 +101,18 @@ object AppModule {
             AppDatabase.MIGRATION_10_11,
             AppDatabase.MIGRATION_11_12,
             AppDatabase.MIGRATION_12_13,
-            AppDatabase.MIGRATION_13_14 // Added MIGRATION_13_14
+            AppDatabase.MIGRATION_13_14,
+            AppDatabase.MIGRATION_14_15,
+            AppDatabase.MIGRATION_15_16,
+            AppDatabase.MIGRATION_16_17 // Added MIGRATION_16_17
         )
-        // .fallbackToDestructiveMigration(dropAllTables = true) // Keep this commented out for now
         .build()
+    }
+    
+    @Provides
+    @Singleton
+    fun provideWorkManager(@ApplicationContext context: Context): WorkManager { // Added WorkManager provider
+        return WorkManager.getInstance(context)
     }
 
     // Operator Info Providers
@@ -92,8 +123,16 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideOperatorRepository(operatorInfoDao: OperatorInfoDao): OperatorRepository {
-        return OperatorRepository(operatorInfoDao) 
+    fun provideOperatorRepository(
+        operatorInfoDao: OperatorInfoDao,
+        firestoreSyncManager: IFirestoreSyncManager,
+        firebaseAuth: FirebaseAuth
+    ): OperatorRepository { 
+        return OperatorRepositoryImpl( 
+            operatorInfoDao,
+            firestoreSyncManager,
+            firebaseAuth
+        ) 
     }
 
     // Work Activity Providers
@@ -108,22 +147,23 @@ object AppModule {
         return database.workActivityComponentCrossRefDao()
     }
 
-    @Provides
-    fun provideWorkActivityTheBoyCrossRefDao(database: AppDatabase): WorkActivityTheBoyCrossRefDao {
-        return database.workActivityTheBoyCrossRefDao()
-    }
+    // Removed provideWorkActivityTheBoyCrossRefDao method
 
     @Provides
     @Singleton
     fun provideWorkActivityRepository(
         workActivityDao: WorkActivityDao,
         workActivityComponentCrossRefDao: WorkActivityComponentCrossRefDao,
-        workActivityTheBoyCrossRefDao: WorkActivityTheBoyCrossRefDao // Added TheBoy CrossRef DAO parameter
+        // Removed: workActivityTheBoyCrossRefDao: WorkActivityTheBoyCrossRefDao,
+        firestoreSyncManager: IFirestoreSyncManager, 
+        firebaseAuth: FirebaseAuth
     ): WorkActivityRepository {
         return WorkActivityRepositoryImpl(
             workActivityDao,
             workActivityComponentCrossRefDao,
-            workActivityTheBoyCrossRefDao // Pass TheBoy CrossRef DAO to Impl
+            // Removed: workActivityTheBoyCrossRefDao,
+            firestoreSyncManager, 
+            firebaseAuth
         )
     }
 
@@ -135,8 +175,16 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideActivityCategoryRepository(activityCategoryDao: ActivityCategoryDao): ActivityCategoryRepository {
-        return ActivityCategoryRepositoryImpl(activityCategoryDao)
+    fun provideActivityCategoryRepository(
+        activityCategoryDao: ActivityCategoryDao,
+        firestoreSyncManager: IFirestoreSyncManager, 
+        firebaseAuth: FirebaseAuth
+    ): ActivityCategoryRepository {
+        return ActivityCategoryRepositoryImpl(
+            activityCategoryDao,
+            firestoreSyncManager, 
+            firebaseAuth
+        )
     }
 
     // The Boys Info Providers
@@ -147,8 +195,16 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideTheBoysRepository(theBoysInfoDao: TheBoysInfoDao): TheBoysRepository {
-        return TheBoysRepositoryImpl(theBoysInfoDao)
+    fun provideTheBoysRepository(
+        theBoysInfoDao: TheBoysInfoDao,
+        firestoreSyncManager: IFirestoreSyncManager, 
+        firebaseAuth: FirebaseAuth
+    ): TheBoysRepository {
+        return TheBoysRepositoryImpl(
+            theBoysInfoDao,
+            firestoreSyncManager, 
+            firebaseAuth
+        )
     }
 
     // Production Activity Providers
@@ -159,8 +215,16 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideProductionActivityRepository(productionActivityDao: ProductionActivityDao): ProductionActivityRepository {
-        return ProductionActivityRepositoryImpl(productionActivityDao)
+    fun provideProductionActivityRepository(
+        productionActivityDao: ProductionActivityDao,
+        firestoreSyncManager: IFirestoreSyncManager, 
+        firebaseAuth: FirebaseAuth
+    ): ProductionActivityRepository {
+        return ProductionActivityRepositoryImpl(
+            productionActivityDao,
+            firestoreSyncManager, 
+            firebaseAuth
+        )
     }
 
     // ComponentInfo Providers
@@ -171,7 +235,15 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideComponentInfoRepository(componentInfoDao: ComponentInfoDao): ComponentInfoRepository {
-        return ComponentInfoRepositoryImpl(componentInfoDao)
+    fun provideComponentInfoRepository(
+        componentInfoDao: ComponentInfoDao,
+        firestoreSyncManager: IFirestoreSyncManager, 
+        firebaseAuth: FirebaseAuth
+    ): ComponentInfoRepository {
+        return ComponentInfoRepositoryImpl(
+            componentInfoDao,
+            firestoreSyncManager, 
+            firebaseAuth
+        )
     }
 }

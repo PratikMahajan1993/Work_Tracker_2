@@ -15,6 +15,9 @@ interface OperatorInfoDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(operatorInfo: OperatorInfo)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAllOperators(operators: List<OperatorInfo>) // New method for SyncWorker
+
     @Update
     suspend fun update(operatorInfo: OperatorInfo)
 
