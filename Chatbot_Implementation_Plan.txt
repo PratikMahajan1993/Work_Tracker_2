@@ -1,0 +1,101 @@
+Detailed Implementation Plan for AI Chatbot Feature
+
+This plan outlines the technical steps required to integrate an AI-powered chatbot into the Work Tracker application.
+
+#### Phase 1: Foundational UI & AI Connection
+
+**Objective:** Create the chat interface and establish a basic, non-structured conversation with the Gemini model.
+
+1.  **New Files to Create:**
+    *   `app/src/main/java/com/example/worktracker/ui/chatbot/ChatbotScreen.kt`
+        *   A `@Composable` screen containing a `Scaffold`, a `LazyColumn` to display a list of messages, and a `Row` at the bottom with a `TextField` and an `IconButton` for sending.
+    *   `app/src/main/java/com/example/worktracker/ui/chatbot/ChatbotViewModel.kt`
+        *   An `@HiltViewModel` that will manage the UI state.
+        *   It will expose a `StateFlow<ChatbotUiState>`.
+        *   `ChatbotUiState` will be a `data class` containing `messages: List<Message>`, `isLoading: Boolean`, etc.
+        *   `Message` will be a `data class` with properties like `text: String`, `isFromUser: Boolean`.
+        *   It will inject your existing `GeminiProService`.
+
+2.  **Existing Files to Modify:**
+    *   `app/src/main/java/com/example/worktracker/di/AppModule.kt`
+        *   No changes needed yet if `GeminiProService` is already provided.
+    *   `app/src/main/java/com/example/worktracker/AppRoutes.kt`
+        *   Add: `const val CHATBOT_SCREEN = "chatbot_screen"`
+    *   `app/src/main/java/com/example/worktracker/MainActivity.kt` (or your main navigation host)
+        *   Add a new `composable(AppRoutes.CHATBOT_SCREEN)` that renders the `ChatbotScreen`.
+    *   `app/src/main/java/com/example/worktracker/ui/MainScreen.kt`
+        *   Add a `FloatingActionButton` or `IconButton` that calls `navController.navigate(AppRoutes.CHATBOT_SCREEN)`.
+
+3.  **`GeminiProService.kt` Initial Modification:**
+    *   Ensure it has a function for basic text generation.
+    *   Example: `suspend fun generateContent(prompt: String): String`
+    *   The `ChatbotViewModel` will call this function to get a simple text response from the AI.
+
+---
+
+#### Phase 2: Natural Language Understanding & Structured Data Extraction
+
+**Objective:** Teach the AI to extract work log details into a structured JSON format and provide it with application-specific context.
+
+1.  **Library Recommendations & Setup:**
+    *   **JSON Parsing:** Use `kotlinx.serialization`.
+    *   Modify `app/build.gradle.kts`:
+        *   Add the serialization plugin: `id("org.jetbrains.kotlin.plugin.serialization") version "..."`
+        *   Add the dependency: `implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")`
+        *   Run a Gradle Sync.
+
+2.  **New Files to Create:**
+    *   `app/src/main/java/com/example/worktracker/data/model/ai/ExtractedLogData.kt`
+        *   This file will contain the `@Serializable` data classes for the AI's output.
+        *   Example: `data class ExtractedWorkLog(val category: String, val durationHours: Double? = null, ...)`
+    *   `app/src/main/java/com/example/worktracker/data/model/ai/AiContext.kt`
+        *   A data class to pass context to the service.
+        *   Example: `data class AiContext(val activityCategories: List<String>, val componentNames: List<String>)`
+
+3.  **`GeminiProService.kt` Enhancements:**
+    *   Inject the necessary repositories (e.g., `ActivityCategoryRepository`) to gather context.
+    *   Create a new, specialized function: `suspend fun extractStructuredLog(userInput: String): String`
+    *   Inside this function, build a detailed system prompt instructing the AI to act as an assistant, use the provided context (categories, components), and respond ONLY with a valid, minified JSON object matching the `ExtractedWorkLog` schema.
+
+4.  **`ChatbotViewModel.kt` Logic Update:**
+    *   Modify the `sendMessage` function to call the new `extractStructuredLog` function.
+    *   Implement JSON parsing using `Json.decodeFromString<ExtractedWorkLog>(jsonResponse)` within a `try-catch` block to handle `SerializationException` and other errors gracefully.
+
+---
+
+#### Phase 3: Integration with Logging Forms
+
+**Objective:** Use the parsed data to navigate to and pre-fill the correct logging form.
+
+1.  **New Files to Create:**
+    *   `app/src/main/java/com/example/worktracker/di/ChatbotResultHolder.kt`
+        *   A Hilt-managed `@Singleton` class to hold the parsed `ExtractedWorkLog` object. This avoids passing complex data through navigation arguments.
+        *   Example: `class ChatbotResultHolder @Inject constructor() { var result: ExtractedWorkLog? = null }`
+
+2.  **`ChatbotViewModel.kt` Navigation Logic:**
+    *   Inject the `ChatbotResultHolder`.
+    *   After successfully parsing the JSON, set the result: `chatbotResultHolder.result = extractedData`.
+    *   Use a `SharedFlow` or another single-event mechanism to signal the UI to navigate to the appropriate route (e.g., `AppRoutes.workDetailsRoute(extractedData.category)`).
+
+3.  **Modify Destination ViewModel (e.g., `GenericWorkDetailsViewModel.kt`):**
+    *   Inject the `ChatbotResultHolder`.
+    *   In the `init` block of the ViewModel, check if `chatbotResultHolder.result` is not null.
+    *   If it contains data, update the ViewModel's UI state to pre-fill the form fields.
+    *   **Crucially, set `chatbotResultHolder.result = null`** after reading the data to prevent it from being used again on subsequent navigations.
+
+---
+
+#### Phase 4: Advanced Input Methods
+
+**Objective:** Enhance the chatbot with voice and image input capabilities.
+
+1.  **Voice Input Integration:**
+    *   **API:** Android's built-in `SpeechRecognizer`.
+    *   **`ChatbotScreen.kt`:** Add a microphone icon. Use `rememberLauncherForActivityResult` for the `RECORD_AUDIO` permission and another launcher for the speech recognition intent.
+    *   **`AndroidManifest.xml`:** Add the `<uses-permission android:name="android.permission.RECORD_AUDIO" />` permission.
+
+2.  **Image Input Integration:**
+    *   **API:** Gemini's multimodal capabilities (Gemini Pro Vision).
+    *   **`ChatbotScreen.kt`:** Add an image/attachment icon. Use `rememberLauncherForActivityResult` with `ActivityResultContracts.PickVisualMedia` to launch the photo picker.
+    *   **`ChatbotViewModel.kt`:** Store the selected image's `Uri` in the UI state and convert it to a `Bitmap` when sending the request.
+    *   **`GeminiProService.kt`:** Create a new multimodal function `suspend fun extractStructuredLogFromImage(userInput: String, image: Bitmap): String`. The prompt will be updated to instruct the model to use both text and image context.
